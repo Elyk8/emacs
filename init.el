@@ -42,7 +42,7 @@
   (add-hook #'after-init-hook #'quelpa-upgrade-all-maybe))
 
 (use-package auto-package-update
-  :defer 10
+  :defer 1
   :config
   ;; Delete residual old versions
   (setq auto-package-update-delete-old-versions t)
@@ -2500,7 +2500,7 @@ folder, otherwise delete a word"
         org-roam-ui-update-on-save t))
 
 (use-package popwin
-  :defer 0
+  :defer 1
   :config
   (popwin-mode 1))
 
