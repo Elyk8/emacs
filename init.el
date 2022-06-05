@@ -25,9 +25,6 @@
 (setq use-package-verbose nil)
 (setq package-native-compile t)
 
-;; Don't enable packages at startup
-(setq package-enable-at-startup nil)
-
 (use-package quelpa-use-package
   :demand t
   :init
@@ -72,17 +69,37 @@
                               (time-subtract after-init-time before-init-time)))
                      gcs-done)))
 
-(defconst IS-MAC     (eq system-type 'darwin))
-(defconst IS-LINUX   (eq system-type 'gnu/linux))
-(defconst IS-WINDOWS (memq system-type '(cygwin windows-nt ms-dos)))
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Calculated variables ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;; At this point things can be local now
-(defvar elk-doom-modeline-text-height nil "My preferred modeline text height.")
-(defvar elk-text-height nil "My preferred default text height.")
-(defvar elk-default-line-spacing 0 "Baseline line spacing.")
-(setq-default elk-default-line-spacing 0)
+;; Set `elk/computer' to 'gpd or 'laptop.
+(let ((sys (system-name)))
+  (if (string= sys "gpdskynet")
+      (setq elk/computer 'gpd)
+    (setq elk/computer 'laptop)))
+
+;;;;;;;;;;;;;;;;;;;;;;
+;; Custom variables ;;
+;;;;;;;;;;;;;;;;;;;;;;
+
+(defcustom elk-doom-modeline-text-height nil "My preferred modeline text height.")
+(defcustom elk-text-height nil "My preferred default text height.")
+(defcustom elk-default-line-spacing 0 "Baseline line spacing.")
+(defcustom elk-fixed-pitch-font "JetBrains Mono Nerd Font" "My preferred fixed monospace font face")
+(defcustom elk-variable-pitch-font "sans" "My preferred variable font face")
+
+(if (eq elk/computer 'gpd)
+    (setq elk-text-height 120)
+  (setq elk-text-height 140))
+
+(if (eq elk/computer 'gpd)
+    (setq elk-doom-modeline-text-height 120)
+  (setq elk-doom-modeline-text-height 140))
 
 (setq elk/init.org (expand-file-name "init.org" user-emacs-directory))
+(setq org-directory (file-truename "~/org"))
+(setq org-roam-directory (file-truename "~/roam"))
 
 ;;;;;;;;;;;;;;;;;;;;;;
 ;; Window Functions ;;
@@ -443,8 +460,8 @@ If the universal prefix argument is used then will the windows too."
 ;; When emacs asks for "yes" or "no", let "y" or "n" suffice
 (setq use-short-answers t)
 
-;; Confirm to quit
-(setq confirm-kill-emacs 'yes-or-no-p)
+;; When I want to kill emacs, I really want to kill emacs
+(setq confirm-kill-emacs nil)
 
 ;; Major mode of new buffers
 (setq initial-major-mode 'lisp-interaction-mode)
@@ -455,12 +472,12 @@ If the universal prefix argument is used then will the windows too."
 ;; managers, where it can leave unseemly gaps.
 (setq frame-resize-pixelwise t)
 
-;; When opening a file (like double click) on Mac, use an existing frame
-(setq ns-pop-up-frames nil)
-
 ;; But do not resize windows pixelwise, this can cause crashes in some cases
 ;; where we resize windows too quickly.
 (setq window-resize-pixelwise nil)
+
+;; When opening a file (like double click) on Mac, use an existing frame
+(setq ns-pop-up-frames nil)
 
 ;; LINES -----------
 (setq-default truncate-lines t)
@@ -510,7 +527,7 @@ If the universal prefix argument is used then will the windows too."
 (setq line-move-visual t) ;; C-p, C-n, etc uses visual lines
 
 ;; Blank scratch buffer
-(setq initial-scratch-message "")
+(setq initial-scratch-message nil)
 
 ;; Uses system trash rather than deleting forever
 (setq delete-by-moving-to-trash t
@@ -568,10 +585,6 @@ If the universal prefix argument is used then will the windows too."
 
 ;; Show current key-sequence in minibuffer ala 'set showcmd' in vim. Any
 ;; (setq echo-keystrokes 0.8)
-
-
-;; Make Emacs use system clipboard
-(setq select-enable-clipboard t)
 
 (setq save-interprogram-paste-before-kill t
       apropos-do-all t
@@ -637,6 +650,9 @@ If the universal prefix argument is used then will the windows too."
   (evil-set-initial-state 'pdf-view-mode 'motion)
   (evil-set-initial-state 'bufler-list-mode 'emacs)
 
+  (define-key evil-motion-state-map (kbd "SPC") nil)
+  (define-key evil-motion-state-map (kbd "RET") nil)
+  (define-key evil-motion-state-map (kbd "TAB") nil)
   ;; ----- Keybindings
   ;; I tried using evil-define-key for these. Didn't work.
   ;; (define-key evil-motion-state-map "/" 'swiper)
@@ -664,11 +680,6 @@ If the universal prefix argument is used then will the windows too."
   (evil-define-key 'motion 'help-mode-map "q" 'kill-this-buffer)
   (evil-define-key 'motion 'calendar-mode-map "q" 'kill-this-buffer))
 
-(use-package evil-surround
-  :after evil
-  :config
-  (global-evil-surround-mode 1))
-
 (use-package evil-collection
   :after evil
   :config
@@ -678,16 +689,6 @@ If the universal prefix argument is used then will the windows too."
   (evil-collection-define-key 'normal 'dired-mode-map
     (kbd "RET") 'dired-find-alternate-file)
   )
-
-;; Allows you to use the selection for * and #
-(use-package evil-visualstar
-  :commands (evil-visualstar/begin-search
-             evil-visualstar/begin-search-forward
-             evil-visualstar/begin-search-backward)
-  :init
-  (evil-define-key* 'visual 'global
-    "*" #'evil-visualstar/begin-search-forward
-    "#" #'evil-visualstar/begin-search-backward))
 
 (use-package evil-numbers
   :after evil
@@ -699,8 +700,31 @@ If the universal prefix argument is used then will the windows too."
   :diminish evil-snipe-mode
   :diminish evil-snipe-local-mode
   :after evil
+  :init
+  (setq evil-snipe-smart-case t
+        evil-snipe-scope 'line
+        evil-snipe-repeat-scope 'visible
+        evil-snipe-char-fold t)
   :config
-  (evil-snipe-mode +1))
+  (evil-snipe-mode 1))
+
+(use-package evil-surround
+  :after evil
+  :config
+  (general-define-key
+   :states 'visual
+   "s" 'evil-surround-region)
+  (global-evil-surround-mode 1))
+
+;; Allows you to use the selection for * and #
+(use-package evil-visualstar
+  :commands (evil-visualstar/begin-search
+             evil-visualstar/begin-search-forward
+             evil-visualstar/begin-search-backward)
+  :init
+  (evil-define-key* 'visual 'global
+    "*" #'evil-visualstar/begin-search-forward
+    "#" #'evil-visualstar/begin-search-backward))
 
 (use-package general
   :config
@@ -768,9 +792,11 @@ If the universal prefix argument is used then will the windows too."
   "ehf" '(elk-hydra-variable-fonts/body :which-key "mixed-pitch face")
   "ehw" '(elk-hydra-window/body :which-key "window control")
 
+  ;; Files
   "ef" '(nil :which-key "open files")
   "efa" '((lambda () (interactive) (find-file "~/org/agenda.org")) :which-key "agenda.org")
   "efe" '((lambda () (interactive) (find-file "~/org/elfeed.org")) :which-key "elfeed.org")
+  "eff" '((lambda () (interactive) (find-file "~/.config/fontconfig/fonts.conf")) :which-key "fonts.conf")
   "efi" '((lambda () (interactive) (find-file "~/.config/i3/i3.org")) :which-key "i3.org")
   "efp" '((lambda () (interactive) (find-file "~/.config/polybar/polybar.org")) :which-key "polybar.org")
   "efs" '((lambda () (interactive) (find-file "~/.config/sxhkd/sxhkd.org")) :which-key "sxhkd.org")
@@ -792,19 +818,22 @@ If the universal prefix argument is used then will the windows too."
 ;;"fo" '(reveal-in-osx-finder :which-key "reveal in finder")
 ;;"fO" '(jib/open-buffer-file-mac :which-key "open buffer file")
 
+(use-package helpful
+  :config
+  (defvar read-symbol-positions-list nil))
+
 (elk/leader-key-def
   ;; Help/emacs
   "h" '(nil :which-key "help/emacs")
 
-  "hv" '(describe-variable :which-key "des. variable")
-  "hb" '(describe-bindings :which-key "des. bindings")
-  "hM" '(describe-mode :which-key "des. mode")
-  "hf" '(describe-function :which-key "des. func")
+  "hd" '(helpful-at-point :which-key "des. at point")
+  "hv" '(helpful-variable :which-key "des. variable")
+  "hb" '(embark-bindings :which-key "des. bindings")
+  "hM" '(helpful-mode :which-key "des. mode")
+  "hf" '(helpful-callable :which-key "des. func")
   "hF" '(describe-face :which-key "des. face")
-  "hk" '(describe-key :which-key "des. key")
-  "ho" '(describe-symbol :which-key "des. sym")
-
-  "hed" '(elk/edit-init :which-key "edit init.org")
+  "hk" '(helpful-key :which-key "des. key")
+  "ho" '(helpful-symbol :which-key "des. sym")
 
   "hm" '(nil :which-key "switch mode")
   "hme" '(emacs-lisp-mode :which-key "elisp mode")
@@ -916,76 +945,107 @@ If the universal prefix argument is used then will the windows too."
   (define-key org-src-mode-map (kbd "C-c C-c") #'org-edit-src-exit))
 
 (general-def
- :prefix ","
- :states 'motion
- :keymaps '(org-mode-map) ;; Available in org mode, org agenda
- "" nil
- "." '(consult-org-heading :which-key "consult-org-heading")
- "A" '(org-archive-subtree-default :which-key "org-archive")
- "a" '(org-agenda :which-key "org agenda")
- "6" '(org-sort :which-key "sort")
- "c" '(org-capture :which-key "org-capture")
- "s" '(org-schedule :which-key "schedule")
- "S" '(elk/org-schedule-tomorrow :which-key "schedule")
- "d" '(org-deadline :which-key "deadline")
- "g" '(org-goto :which-key "goto heading")
- "t" '(org-tag :which-key "set tags")
- "o" '(elk/org-download-paste-clipboard :which-key "paste attach")
- "p" '(org-set-property :which-key "set property")
- "r" '(elk/org-refile-this-file :which-key "refile in file")
- "e" '(org-export-dispatch :which-key "export org")
- "B" '(org-toggle-narrow-to-subtree :which-key "toggle narrow to subtree")
- "V" '(elk/org-set-startup-visibility :which-key "startup visibility")
- "H" '(org-html-convert-region-to-html :which-key "convert region to html")
+  :prefix ","
+  :states 'motion
+  :keymaps '(org-mode-map) ;; Available in org mode, org agenda
+  "" nil
+  "." '(consult-org-heading :which-key "consult-org-heading")
+  "A" '(org-archive-subtree-default :which-key "org-archive")
+  "a" '(org-agenda :which-key "org agenda")
+  "c" '(org-capture :which-key "org-capture")
+  "s" '(org-schedule :which-key "schedule")
+  "S" '(elk/org-schedule-tomorrow :which-key "schedule")
+  "d" '(org-deadline :which-key "deadline")
+  "g" '(org-goto :which-key "goto heading")
+  "t" '(org-tag :which-key "set tags")
+  "o" '(elk/org-download-paste-clipboard :which-key "paste attach")
+  "p" '(org-set-property :which-key "set property")
+  "r" '(elk/org-refile-this-file :which-key "refile in file")
+  "e" '(org-export-dispatch :which-key "export org")
+  "B" '(org-toggle-narrow-to-subtree :which-key "toggle narrow to subtree")
+  "V" '(elk/org-set-startup-visibility :which-key "startup visibility")
+  "H" '(org-html-convert-region-to-html :which-key "convert region to html")
 
- ;; org-babel
- "b" '(nil :which-key "babel")
- "bt" '(org-babel-tangle :which-key "org-babel-tangle")
- "bb" '(org-edit-special :which-key "org-edit-special")
- "bc" '(org-edit-src-abort :which-key "org-edit-src-abort")
- "bk" '(org-babel-remove-result-one-or-many :which-key "org-babel-remove-result-one-or-many")
+  ;; org-babel
+  "b" '(nil :which-key "babel")
+  "bt" '(org-babel-tangle :which-key "org-babel-tangle")
+  "bb" '(org-edit-special :which-key "org-edit-special")
+  "bc" '(org-edit-src-abort :which-key "org-edit-src-abort")
+  "bk" '(org-babel-remove-result-one-or-many :which-key "org-babel-remove-result-one-or-many")
 
- "x" '(nil :which-key "text")
- "xb" (spacemacs|org-emphasize elk/org-bold ?*)
- "xc" (spacemacs|org-emphasize elk/org-code ?~)
- "xi" (spacemacs|org-emphasize elk/org-italic ?/)
- "xs" (spacemacs|org-emphasize elk/org-strike-through ?+)
- "xu" (spacemacs|org-emphasize elk/org-underline ?_)
- "xv" (spacemacs|org-emphasize elk/org-verbose ?~) ;; I realized that ~~ is the same and better than == (Github won't do ==)
+  "x" '(nil :which-key "text")
+  "xb" (spacemacs|org-emphasize elk/org-bold ?*)
+  "xc" (spacemacs|org-emphasize elk/org-code ?~)
+  "xi" (spacemacs|org-emphasize elk/org-italic ?/)
+  "xs" (spacemacs|org-emphasize elk/org-strike-through ?+)
+  "xu" (spacemacs|org-emphasize elk/org-underline ?_)
+  "xv" (spacemacs|org-emphasize elk/org-verbose ?~) ;; I realized that ~~ is the same and better than == (Github won't do ==)
 
- ;; insert
- "i" '(nil :which-key "insert")
+  ;; insert
+  "i" '(nil :which-key "insert")
 
- "it" '(nil :which-key "tables")
- "itt" '(org-table-create :which-key "create table")
- "itl" '(org-table-insert-hline :which-key "table hline")
+  "it" '(nil :which-key "tables")
+  "itt" '(org-table-create :which-key "create table")
+  "itl" '(org-table-insert-hline :which-key "table hline")
 
- "il" '(org-insert-link :which-key "link")
+  "il" '(org-insert-link :which-key "link")
 
- ;; clocking
- "c" '(nil :which-key "clocking")
- "ci" '(org-clock-in :which-key "clock in")
- "co" '(org-clock-out :which-key "clock out")
- "cj" '(org-clock-goto :which-key "jump to clock")
- )
+  ;; clocking
+  "c" '(nil :which-key "clocking")
+  "ci" '(org-clock-in :which-key "clock in")
+  "co" '(org-clock-out :which-key "clock out")
+  "cj" '(org-clock-goto :which-key "jump to clock")
+  )
 
+;; (general-define-key
+;;  :prefix ","
+;;  :states 'motion
+;;  :keymaps '(org-agenda-mode-map) ;; Available in org mode, org agenda
+;;  "" nil
+;;  "a" '(org-agenda :which-key "org agenda")
+;;  "c" '(org-capture :which-key "org-capture")
+;;  "s" '(org-agenda-schedule :which-key "schedule")
+;;  "d" '(org-agenda-deadline :which-key "deadline")
+;;  "t" '(org-agenda-set-tags :which-key "set tags")
+;;  ;; clocking
+;;  "c" '(nil :which-key "clocking")
+;;  "ci" '(org-agenda-clock-in :which-key "clock in")
+;;  "co" '(org-agenda-clock-out :which-key "clock out")
+;;  "cj" '(org-clock-goto :which-key "jump to clock")
+;;  )
 
 (general-define-key
- :prefix ","
+ :keymaps 'org-agenda-mode-map
  :states 'motion
- :keymaps '(org-agenda-mode-map) ;; Available in org mode, org agenda
- "" nil
- "a" '(org-agenda :which-key "org agenda")
- "c" '(org-capture :which-key "org-capture")
- "s" '(org-agenda-schedule :which-key "schedule")
- "d" '(org-agenda-deadline :which-key "deadline")
- "t" '(org-agenda-set-tags :which-key "set tags")
- ;; clocking
- "c" '(nil :which-key "clocking")
- "ci" '(org-agenda-clock-in :which-key "clock in")
- "co" '(org-agenda-clock-out :which-key "clock out")
- "cj" '(org-clock-goto :which-key "jump to clock")
- )
+ ;; motion keybindings
+ "j" 'org-agenda-next-line
+ "k" 'org-agenda-previous-line
+ "c" 'org-agenda-capture
+ "gj" 'org-agenda-next-item
+ "gk" 'org-agenda-previous-item
+ "gH" 'evil-window-top
+ "gM" 'evil-window-middle
+ "gL" 'evil-window-bottom
+ "C-j" 'org-agenda-next-item
+ "C-k" 'org-agenda-previous-item
+ "[[" 'org-agenda-earlier
+ "]]" 'org-agenda-later
+
+ ;; actions
+ "t" 'org-agenda-todo
+ "r" 'org-agenda-refile
+ "d" 'org-agenda-deadline
+ "s" 'org-agenda-schedule
+
+ ;; goto
+ "." 'org-agenda-goto-today
+
+ ;; refresh
+ "gr" 'org-agenda-redo
+ "gR" 'org-agenda-redo-all
+
+ ;; quit
+ (kbd "<escape>") 'org-agenda-quit)
 
 ;; All-mode keymaps
 (general-def
@@ -1114,7 +1174,6 @@ _q_uit          _e_qualize        _]_forward     ^
    ("<down>" windresize-down)
    ("<up>" windresize-up)
 
-
    ("q" nil))
 
 (use-package company
@@ -1177,8 +1236,10 @@ _q_uit          _e_qualize        _]_forward     ^
             "C-p" #'corfu-previous
             "<escape>" #'corfu-quit
             "<return>" #'corfu-insert
-            "M-d" #'corfu-show-documentation
-            "M-l" #'corfu-show-location)
+            "C-d" #'corfu-show-documentation
+            "C-l" #'corfu-show-location)
+  (:states 'insert
+           "C-SPC" 'completion-at-point)
   ;; Optional customizations
   :custom
   (corfu-auto nil)        ; Only use `corfu' when calling `completion-at-point' or
@@ -1212,8 +1273,8 @@ _q_uit          _e_qualize        _]_forward     ^
   ;; :hook ((prog-mode . corfu-mode)
   ;;        (shell-mode . corfu-mode)
   ;;        (eshell-mode . corfu-mode))
-  :config
-  (global-corfu-mode))
+  :init
+  (global-corfu-mode 1))
 
 ;; Add icons to corfu
 (use-package kind-icon
@@ -1234,7 +1295,6 @@ _q_uit          _e_qualize        _]_forward     ^
   (add-to-list 'corfu-margin-formatters #'kind-icon-margin-formatter))
 
 (use-package corfu-doc
-  ;; NOTE 2022-02-05: At the time of writing, `corfu-doc' is not yet on melpa
   :after corfu
   :hook (corfu-mode . corfu-doc-mode)
   :general (:keymaps 'corfu-map
@@ -1252,7 +1312,6 @@ _q_uit          _e_qualize        _]_forward     ^
   ;; extra-safe that this is set when corfu-doc is loaded. I do not want
   ;; documentation shown in both the echo area and in the `corfu-doc' popup.
   (corfu-echo-documentation nil))
-
 
 ;; Add extensions
 (use-package cape
@@ -1274,9 +1333,6 @@ _q_uit          _e_qualize        _]_forward     ^
   ;;        ("C-c p ^" . cape-tex)
   ;;        ("C-c p &" . cape-sgml)
   ;;        ("C-c p r" . cape-rfc1345))
-  :general
-  (:states 'insert
-           "C-SPC" 'completion-at-point)
   :init
   ;; Add `completion-at-point-functions', used by `completion-at-point'.
   (add-to-list 'completion-at-point-functions #'cape-file)
@@ -1351,10 +1407,6 @@ folder, otherwise delete a word"
   ;; (setq read-extended-command-predicate
   ;;       #'command-completion-default-include-p)
 
-  ;; Enable indentation+completion using the TAB key.
-  ;; `completion-at-point' is often bound to M-TAB.
-  (setq tab-always-indent 'complete)
-  
   ;; Add prompt indicator to `completing-read-multiple'.
   ;; We display [CRM<separator>], e.g., [CRM,] if the separator is a comma.
   (defun crm-indicator (args)
@@ -1508,7 +1560,6 @@ folder, otherwise delete a word"
    ("C-h B" . embark-bindings)) ;; alternative for `describe-bindings'
 
   :init
-
   ;; Optionally replace the key help with a completing-read interface
   (setq prefix-help-command #'embark-prefix-help-command)
 
@@ -1534,9 +1585,9 @@ folder, otherwise delete a word"
   :config (setq wgrep-auto-save-buffer t))
 
 (use-package orderless
-  :demand t
   :config
   (setq completion-styles '(orderless flex)
+        completion-category-defaults nil
         completion-category-overrides '((eglot (styles . (orderless flex)))))
   (set-face-attribute 'completions-first-difference nil :inherit nil))
 
@@ -1765,20 +1816,17 @@ folder, otherwise delete a word"
   :after yasnippet)
 
 (setq text-scale-mode-step 1.1) ;; How much to adjust text scale by when using `text-scale-mode'
-(setq elk-default-line-spacing 0) ;; This happens in the variables but I guess I have it here too.
 
 (setq-default line-spacing elk-default-line-spacing)
 
-(setq elk-text-height 140)
-
-(set-face-attribute 'default nil :family "monospace" :weight 'medium :height elk-text-height)
+(set-face-attribute 'default nil :family elk-fixed-pitch-font :weight 'medium :height elk-text-height)
 
 ;; Float height value (1.0) makes fixed-pitch take height 1.0 * height of default
 ;; This means it will scale along with default when the text is zoomed
-(set-face-attribute 'fixed-pitch nil :font "monospace" :weight 'regular :height 1.0)
+(set-face-attribute 'fixed-pitch nil :font elk-fixed-pitch-font :weight 'regular :height 1.0)
 
 ;; Height of 160 seems to match perfectly with 12-point on Google Docs
-(set-face-attribute 'variable-pitch nil :family "sans" :height elk-text-height)
+(set-face-attribute 'variable-pitch nil :family elk-variable-pitch-font :height elk-text-height)
 
 (use-package mixed-pitch
   :defer t
@@ -1808,7 +1856,6 @@ folder, otherwise delete a word"
           doom-modeline-major-mode-color-icon t
           doom-modeline-bar-width 3))
 
-  (setq elk-doom-modeline-text-height 140)
   (setq doom-modeline-height 1)
 
 (use-package hide-mode-line
@@ -1837,18 +1884,6 @@ folder, otherwise delete a word"
   (mode-line-inactive ((t (:height ,elk-doom-modeline-text-height))))
   (org-scheduled-previously ((t (:background "red")))))
 
-(use-package kaolin-themes
-  :config
-  (setq kaolin-themes-modeline-border nil)
-  :custom-face
-  ;; Keep the modeline proper every time I use these themes.
-  (mode-line ((t (:height ,elk-doom-modeline-text-height))))
-  (mode-line-inactive ((t (:height ,elk-doom-modeline-text-height))))
-  ;; Disable underline for org deadline warnings. I don't like the way it looks.
-  (org-warning ((t (:underline nil))))
-  ;; Darkens the org-ellipsis (first unset the color, then give it shadow)
-  (org-ellipsis ((t (:foreground unspecified :height 0.8 :inherit 'shadow)))))
-
 ;; Load the theme here
 (elk/load-theme 'doom-dracula)
 
@@ -1861,6 +1896,10 @@ folder, otherwise delete a word"
 
 (add-hook 'prog-mode-hook 'hl-line-mode)
 (add-hook 'prog-mode-hook 'display-line-numbers-mode)
+
+;; This makes emacs transparent
+(set-frame-parameter (selected-frame) 'alpha '(95 . 95))
+(add-to-list 'default-frame-alist '(alpha . (95 . 95)))
 
 (use-package visual-fill-column
   :defer t
@@ -1888,26 +1927,25 @@ folder, otherwise delete a word"
     (org-super-agenda-mode))
 
 (use-package org-superstar
-:after org
-:config
-(setq org-superstar-headline-bullets-list '("\u25c9" "\u25cb" "\u25cf" "\u25cb" "\u25cf" "\u25cb" "\u25cf")
-      org-superstar-leading-bullet ?\s
-      org-superstar-leading-fallback ?\s
-      org-superstar-item-bullet-alist '((?+ . ?➤) (?- . ?✦)) ; changes +/- symbols in item lists
-      org-superstar-prettify-item-bullets t
-      org-hide-leading-stars nil)
-(setq org-superstar-special-todo-items t  ;; Makes TODO header bullets into boxes
-      org-superstar-todo-bullet-alist '(("TODO" . 9744)
-                                        ("INPROG-TODO" . 9744)
-                                        ("HW" . 9744)
-                                        ("STUDY" . 9744)
-                                        ("SOMEDAY" . 9744)
-                                        ("READ" . 9744)
-                                        ("PROJ" . 9744)
-                                        ("CONTACT" . 9744)
-                                        ("DONE" . 9745)))
-:hook (org-mode . org-superstar-mode)
-)
+  :hook (org-mode . org-superstar-mode)
+  :config
+  (setq org-superstar-headline-bullets-list '("\u25c9" "\u25cb" "\u25cf" "\u25cb" "\u25cf" "\u25cb" "\u25cf")
+        org-superstar-leading-bullet ?\s
+        org-superstar-leading-fallback ?\s
+        org-superstar-item-bullet-alist '((?+ . ?➤) (?- . ?✦)) ; changes +/- symbols in item lists
+        org-superstar-prettify-item-bullets t
+        org-hide-leading-stars t)
+  (setq org-superstar-special-todo-items t  ;; Makes TODO header bullets into boxes
+        org-superstar-todo-bullet-alist '(("TODO" . 9744)
+                                          ("INPROG-TODO" . 9744)
+                                          ("HW" . 9744)
+                                          ("STUDY" . 9744)
+                                          ("SOMEDAY" . 9744)
+                                          ("READ" . 9744)
+                                          ("PROJ" . 9744)
+                                          ("CONTACT" . 9744)
+                                          ("DONE" . 9745)))
+  )
 
 ;; Removes gap when you add a new heading
 (setq org-blank-before-new-entry '((heading . nil) (plain-list-item . nil)))
@@ -2089,6 +2127,7 @@ folder, otherwise delete a word"
 
 (setq org-cycle-separator-lines 1)
 (setq org-catch-invisible-edits 'smart)
+(setq org-return-follows-link t)
 
 (setq org-edit-src-content-indentation 0
       org-src-tab-acts-natively t
@@ -2399,7 +2438,6 @@ folder, otherwise delete a word"
   :custom
   (org-roam-node-display-template
    (concat "${title:*} " (propertize "${tags:42}" 'face 'org-tag)))
-  (org-roam-directory (file-truename "~/roam"))
   (org-roam-completion-everywhere t)
   (org-roam-list-files-commands '(fd fdfind rg find))
   :bind (("C-c n l" . org-roam-buffer-toggle)
@@ -2498,6 +2536,29 @@ folder, otherwise delete a word"
   (setq org-roam-ui-sync-theme t
         org-roam-ui-follow t
         org-roam-ui-update-on-save t))
+
+(use-package citar
+  :config
+  (setq org-cite-insert-processor 'citar
+        org-cite-follow-processor 'citar
+        org-cite-activate-processor 'citar)
+
+  ;; `org-cite'
+  (setq org-cite-global-bibliography citar-bibliography
+        ;; Setup export processor; default csl/citeproc-el, with biblatex for latex
+        org-cite-export-processors '((latex biblatex) (t csl))
+        org-support-shift-select t))
+
+(use-package org-roam-bibtex
+  :after org-roam)
+
+
+(use-package org-noter
+  :defer t
+  :config
+  (setq org-noter-notes-search-path (list org-directory)
+        org-noter-auto-save-last-location t
+        org-noter-separate-notes-from-heading t))
 
 (use-package popwin
   :defer 1
@@ -2784,16 +2845,13 @@ folder, otherwise delete a word"
   (setq pdf-view-midnight-colors '("#ffffff" . "#121212" )) ;; I use midnight mode as dark mode, dark mode doesn't seem to work
   :general
   (general-define-key :states 'motion :keymaps 'pdf-view-mode-map
-                      "j" 'pdf-view-next-page
-                      "k" 'pdf-view-previous-page
+                      "j" 'pdf-view-next-line-or-next-page
+                      "k" 'pdf-view-previous-line-or-previous-page
 
                       "C-j" 'pdf-view-next-line-or-next-page
                       "C-k" 'pdf-view-previous-line-or-previous-page
 
                       ;; Arrows for movement as well
-                      (kbd "<down>") 'pdf-view-next-line-or-next-page
-                      (kbd "<up>") 'pdf-view-previous-line-or-previous-page
-
                       (kbd "<down>") 'pdf-view-next-line-or-next-page
                       (kbd "<up>") 'pdf-view-previous-line-or-previous-page
 
@@ -2813,16 +2871,22 @@ folder, otherwise delete a word"
   )
 
 (use-package popper
-  :bind (("C-`"   . popper-toggle-latest)
-         ("M-`"   . popper-cycle)
-         ("C-M-`" . popper-toggle-type))
+  :general
+  (:states '(normal visual emacs)
+           :prefix "SPC"
+           "`" 'popper-toggle-latest
+           "~" 'popper-cycle)
+  :custom
+  (popper-window-height 20)
+  (popper-mode-line nil)
+  (popper-reference-buffers '("\\*Messages\\*"
+                              "Output\\*$"
+                              "\\*Warnings\\*"
+                              "\\*Async Shell Command\\*"
+                              help-mode
+                              eldoc-mode
+                              compilation-mode))
   :init
-  (setq popper-reference-buffers
-        '("\\*Messages\\*"
-          "Output\\*$"
-          "\\*Warnings\\*"
-          help-mode
-          compilation-mode))
   (popper-mode +1))
 
 (use-package eglot
@@ -2831,7 +2895,11 @@ folder, otherwise delete a word"
   (setq eglot-sync-connect 1
         eglot-connect-timeout 10
         eglot-autoshutdown t
-        eglot-send-changes-idle-time 0.5))
+        eglot-send-changes-idle-time 0.5
+        ;; NOTE We disable eglot-auto-display-help-buffer because :select t in
+        ;;      its popup rule causes eglot to steal focus too often.
+        eglot-auto-display-help-buffer nil)
+  (setq eglot-stay-out-of '(flymake)))
 
 (use-package consult-eglot
   :after eglot consult vertico
@@ -2859,8 +2927,13 @@ folder, otherwise delete a word"
         ("DEBUG"  . "#A020F0")
         ("WIP"   . "#1E90FF"))))
 
+(use-package rainbow-delimiters
+  :defer t
+  :hook (prog-mode . rainbow-delimiters-mode))
+
 ;; A better python mode (supposedly)
 (use-package python-mode
+  :hook (python-mode . eglot-ensure)
   :defer t)
 
 ;; Using my virtual environments
@@ -2904,3 +2977,41 @@ folder, otherwise delete a word"
 (use-package sudo-edit
   :defer t
   :commands sudo-edit sudo-edit-find-file)
+
+(use-package vterm
+  :commands vterm)
+
+(use-package multi-vterm
+  :commands (multi-vterm)
+  :config
+  (add-hook 'vterm-mode-hook
+			(lambda ()
+			  (setq-local evil-insert-state-cursor 'box)
+			  (evil-insert-state)))
+  (define-key vterm-mode-map [return]                      #'vterm-send-return)
+  (setq vterm-keymap-exceptions nil)
+  (evil-define-key 'insert vterm-mode-map (kbd "C-e")      #'vterm--self-insert)
+  (evil-define-key 'insert vterm-mode-map (kbd "C-f")      #'vterm--self-insert)
+  (evil-define-key 'insert vterm-mode-map (kbd "C-a")      #'vterm--self-insert)
+  (evil-define-key 'insert vterm-mode-map (kbd "C-v")      #'vterm--self-insert)
+  (evil-define-key 'insert vterm-mode-map (kbd "C-b")      #'vterm--self-insert)
+  (evil-define-key 'insert vterm-mode-map (kbd "C-w")      #'vterm--self-insert)
+  (evil-define-key 'insert vterm-mode-map (kbd "C-u")      #'vterm--self-insert)
+  (evil-define-key 'insert vterm-mode-map (kbd "C-d")      #'vterm--self-insert)
+  (evil-define-key 'insert vterm-mode-map (kbd "C-n")      #'vterm--self-insert)
+  (evil-define-key 'insert vterm-mode-map (kbd "C-m")      #'vterm--self-insert)
+  (evil-define-key 'insert vterm-mode-map (kbd "C-p")      #'vterm--self-insert)
+  (evil-define-key 'insert vterm-mode-map (kbd "C-j")      #'vterm--self-insert)
+  (evil-define-key 'insert vterm-mode-map (kbd "C-k")      #'vterm--self-insert)
+  (evil-define-key 'insert vterm-mode-map (kbd "C-r")      #'vterm--self-insert)
+  (evil-define-key 'insert vterm-mode-map (kbd "C-t")      #'vterm--self-insert)
+  (evil-define-key 'insert vterm-mode-map (kbd "C-g")      #'vterm--self-insert)
+  (evil-define-key 'insert vterm-mode-map (kbd "C-c")      #'vterm--self-insert)
+  (evil-define-key 'insert vterm-mode-map (kbd "C-SPC")    #'vterm--self-insert)
+  (evil-define-key 'normal vterm-mode-map (kbd "C-d")      #'vterm--self-insert)
+  (evil-define-key 'normal vterm-mode-map (kbd ",c")       #'multi-vterm)
+  (evil-define-key 'normal vterm-mode-map (kbd ",n")       #'multi-vterm-next)
+  (evil-define-key 'normal vterm-mode-map (kbd ",p")       #'multi-vterm-prev)
+  (evil-define-key 'normal vterm-mode-map (kbd "i")        #'evil-insert-resume)
+  (evil-define-key 'normal vterm-mode-map (kbd "o")        #'evil-insert-resume)
+  (evil-define-key 'normal vterm-mode-map (kbd "<return>") #'evil-insert-resume))
