@@ -170,7 +170,7 @@ If run with universal argument C-u, insert org options to make export very plain
 	(let ((old-buffer (current-buffer)) (beg (region-beginning)) (end (region-end)))
 	  (with-temp-buffer
 		(when (equal '(4) arg)
-		  (insert "#+OPTIONS: toc:nil date:nil author:nil num:nil title:nil tags:nil \
+		  (insert "#+options: toc:nil date:nil author:nil num:nil title:nil tags:nil \
               	  todo:nil html-link-use-abs-url:nil html-postamble:nil html-preamble:nil html-scripts:nil tex:nil \
                    html-style:nil html5-fancy:nil tex:nil")) ;; If desired, insert these options for a plain export
 		(insert "\n \n")
@@ -237,6 +237,19 @@ the todo type was if I look back through my archive files."
   "Make function for setting the emphasis in org mode"
   `(defun ,fname () (interactive)
           (org-emphasize ,char)))
+
+(defun org-syntax-convert-keyword-case-to-lower ()
+  "Convert all #+KEYWORDS to #+keywords."
+  (interactive)
+  (save-excursion
+    (goto-char (point-min))
+    (let ((count 0)
+          (case-fold-search nil))
+      (while (re-search-forward "^[ \t]*#\\+[A-Z_]+" nil t)
+        (unless (s-matches-p "RESULTS" (match-string 0))
+          (replace-match (downcase (match-string 0)) t)
+          (setq count (1+ count))))
+      (message "Replaced %d occurances" count))))
 
 ;; From doom emacs
 (defun +org--toggle-inline-images-in-subtree (&optional beg end refresh)
@@ -2080,7 +2093,7 @@ folder, otherwise delete a word"
   (setq org-superstar-headline-bullets-list '("\u25c9" "\u25cb" "\u25cf" "\u25cb" "\u25cf" "\u25cb" "\u25cf")
         org-superstar-leading-bullet ?\s
         org-superstar-leading-fallback ?\s
-        org-superstar-item-bullet-alist '((?+ . ?➤) (?- . ?✦)) ; changes +/- symbols in item lists
+        ;; org-superstar-item-bullet-alist '((?+ . ?➤) (?- . ?✦)) ; changes +/- symbols in item lists
         org-superstar-prettify-item-bullets t
         org-hide-leading-stars t)
   (setq org-superstar-special-todo-items t  ;; Makes TODO header bullets into boxes
