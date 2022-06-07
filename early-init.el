@@ -8,6 +8,8 @@
 (setq native-comp-async-report-warnings-errors nil) ;; native-comp warning
 (setq byte-compile-warnings '(not free-vars unresolved noruntime lexical make-local))
 
+;; Don't enable packages at startup
+(setq package-enable-at-startup nil)
 
 ;; MISC OPTIMIZATIONS ----
 ;;; optimizations (froom Doom's core.el). See that file for descriptions.
@@ -47,7 +49,3 @@
 
 ;; This makes the Aqua titlebar color the same as Emacs.
 (add-to-list 'default-frame-alist '(ns-transparent-titlebar . t))
-
-;; This makes emacs transparent
-(set-frame-parameter (selected-frame) 'alpha '(95 . 95))
-(add-to-list 'default-frame-alist '(alpha . (95 . 95)))
