@@ -101,10 +101,6 @@
 (setq org-directory (file-truename "~/org"))
 (setq org-roam-directory (file-truename "~/roam"))
 
-;;;;;;;;;;;;;;;;;;;;;;
-;; Window Functions ;;
-;;;;;;;;;;;;;;;;;;;;;;
-
 (defun elk/split-window-vertically-and-switch ()
   (interactive)
   (split-window-vertically)
@@ -125,10 +121,6 @@
     (progn
       (window-configuration-to-register ?_)
       (delete-other-windows))))
-
-;;;;;;;;;;;;;;;;;;;;;;
-;; Evil Functions ;;
-;;;;;;;;;;;;;;;;;;;;;;
 
 ;;;###autoload
 (defun +evil-shift-left ()
@@ -161,14 +153,6 @@
   (call-interactively #'evil-org->)
   (evil-normal-state)
   (evil-visual-restore))
-
-(defun elk/evil-yank-highlight (orig-fn beg end &rest args)
-  (pulse-momentary-highlight-region beg end)
-  (apply orig-fn beg end args))
-
-;;;;;;;;;;;;;
-;; Orgmode ;;
-;;;;;;;;;;;;;
 
 (defun elk/org-agenda-caller (letter)
   "Calls a specific org agenda view specified by the letter argument."
@@ -254,22 +238,166 @@ the todo type was if I look back through my archive files."
   `(defun ,fname () (interactive)
           (org-emphasize ,char)))
 
-;;;;;;;;;;;;;;;;;;
-;; Calculations ;;
-;;;;;;;;;;;;;;;;;;
+;; From doom emacs
+(defun +org--toggle-inline-images-in-subtree (&optional beg end refresh)
+  "Refresh inline image previews in the current heading/tree."
+  (let* ((beg (or beg
+                  (if (org-before-first-heading-p)
+                      (save-excursion (point-min))
+                    (save-excursion (org-back-to-heading) (point)))))
+         (end (or end
+                  (if (org-before-first-heading-p)
+                      (save-excursion (org-next-visible-heading 1) (point))
+                    (save-excursion (org-end-of-subtree) (point)))))
+         (overlays (cl-remove-if-not (lambda (ov) (overlay-get ov 'org-image-overlay))
+                                     (ignore-errors (overlays-in beg end)))))
+    (dolist (ov overlays nil)
+      (delete-overlay ov)
+      (setq org-inline-image-overlays (delete ov org-inline-image-overlays)))
+    (when (or refresh (not overlays))
+      (org-display-inline-images t t beg end)
+      t)))
 
-(defun jib/calc-speaking-time ()
-  "Calculate how long it would take me to speak aloud the selection."
-  (interactive)
-  (if (use-region-p) (let* ((wpm 150)
-							(word-count (float (count-words-region (region-beginning) (region-end))))
-							(raw-time (* 60 (/ word-count wpm))))
-					   (message "%s minutes, %s seconds to speak at %d wpm"
-								(format-seconds "%m" raw-time)
-								(floor(mod raw-time 60)) wpm))
-	(error "Error: select a region.")))
+;;;###autoload
+(defun +org/dwim-at-point (&optional arg)
+  "Do-what-I-mean at point.
 
-;;;; Misc
+If on a:
+- checkbox list item or todo heading: toggle it.
+- citation: follow it
+- headline: cycle ARCHIVE subtrees, toggle latex fragments and inline images in
+  subtree; update statistics cookies/checkboxes and ToCs.
+- clock: update its time.
+- footnote reference: jump to the footnote's definition
+- footnote definition: jump to the first reference of this footnote
+- timestamp: open an agenda view for the time-stamp date/range at point.
+- table-row or a TBLFM: recalculate the table's formulas
+- table-cell: clear it and go into insert mode. If this is a formula cell,
+  recaluclate it instead.
+- babel-call: execute the source block
+- statistics-cookie: update it.
+- src block: execute it
+- latex fragment: toggle it.
+- link: follow it
+- otherwise, refresh all inline images in current tree."
+  (interactive "P")
+  (if (button-at (point))
+      (call-interactively #'push-button)
+    (let* ((context (org-element-context))
+           (type (org-element-type context)))
+      ;; skip over unimportant contexts
+      (while (and context (memq type '(verbatim code bold italic underline strike-through subscript superscript)))
+        (setq context (org-element-property :parent context)
+              type (org-element-type context)))
+      (pcase type
+        ((or `citation `citation-reference)
+         (org-cite-follow context arg))
+
+        (`headline
+         (cond ((memq (bound-and-true-p org-goto-map)
+                      (current-active-maps))
+                (org-goto-ret))
+               ((and (fboundp 'toc-org-insert-toc)
+                     (member "TOC" (org-get-tags)))
+                (toc-org-insert-toc)
+                (message "Updating table of contents"))
+               ((string= "ARCHIVE" (car-safe (org-get-tags)))
+                (org-force-cycle-archived))
+               ((or (org-element-property :todo-type context)
+                    (org-element-property :scheduled context))
+                (org-todo
+                 (if (eq (org-element-property :todo-type context) 'done)
+                     (or (car (+org-get-todo-keywords-for (org-element-property :todo-keyword context)))
+                         'todo)
+                   'done))))
+         ;; Update any metadata or inline previews in this subtree
+         (org-update-checkbox-count)
+         (org-update-parent-todo-statistics)
+         (when (and (fboundp 'toc-org-insert-toc)
+                    (member "TOC" (org-get-tags)))
+           (toc-org-insert-toc)
+           (message "Updating table of contents"))
+         (let* ((beg (if (org-before-first-heading-p)
+                         (line-beginning-position)
+                       (save-excursion (org-back-to-heading) (point))))
+                (end (if (org-before-first-heading-p)
+                         (line-end-position)
+                       (save-excursion (org-end-of-subtree) (point))))
+                (overlays (ignore-errors (overlays-in beg end)))
+                (latex-overlays
+                 (cl-find-if (lambda (o) (eq (overlay-get o 'org-overlay-type) 'org-latex-overlay))
+                             overlays))
+                (image-overlays
+                 (cl-find-if (lambda (o) (overlay-get o 'org-image-overlay))
+                             overlays)))
+           (+org--toggle-inline-images-in-subtree beg end)
+           (if (or image-overlays latex-overlays)
+               (org-clear-latex-preview beg end)
+             (org--latex-preview-region beg end))))
+
+        (`clock (org-clock-update-time-maybe))
+
+        (`footnote-reference
+         (org-footnote-goto-definition (org-element-property :label context)))
+
+        (`footnote-definition
+         (org-footnote-goto-previous-reference (org-element-property :label context)))
+
+        ((or `planning `timestamp)
+         (org-follow-timestamp-link))
+
+        ((or `table `table-row)
+         (if (org-at-TBLFM-p)
+             (org-table-calc-current-TBLFM)
+           (ignore-errors
+             (save-excursion
+               (goto-char (org-element-property :contents-begin context))
+               (org-call-with-arg 'org-table-recalculate (or arg t))))))
+
+        (`table-cell
+         (org-table-blank-field)
+         (org-table-recalculate arg)
+         (when (and (string-empty-p (string-trim (org-table-get-field)))
+                    (bound-and-true-p evil-local-mode))
+           (evil-change-state 'insert)))
+
+        (`babel-call
+         (org-babel-lob-execute-maybe))
+
+        (`statistics-cookie
+         (save-excursion (org-update-statistics-cookies arg)))
+
+        ((or `src-block `inline-src-block)
+         (org-babel-execute-src-block arg))
+
+        ((or `latex-fragment `latex-environment)
+         (org-latex-preview arg))
+
+        (`link
+         (let* ((lineage (org-element-lineage context '(link) t))
+                (path (org-element-property :path lineage)))
+           (if (or (equal (org-element-property :type lineage) "img")
+                   (and path (image-type-from-file-name path)))
+               (+org--toggle-inline-images-in-subtree
+                (org-element-property :begin lineage)
+                (org-element-property :end lineage))
+             (org-open-at-point arg))))
+
+        (`paragraph
+         (+org--toggle-inline-images-in-subtree))
+
+        ((guard (org-element-property :checkbox (org-element-lineage context '(item) t)))
+         (let ((match (and (org-at-item-checkbox-p) (match-string 1))))
+           (org-toggle-checkbox (if (equal match "[ ]") '(16)))))
+
+        (_
+         (if (or (org-in-regexp org-ts-regexp-both nil t)
+                 (org-in-regexp org-tsr-regexp-both nil  t)
+                 (org-in-regexp org-link-any-re nil t))
+             (call-interactively #'org-open-at-point)
+           (+org--toggle-inline-images-in-subtree
+            (org-element-property :begin context)
+            (org-element-property :end context))))))))
 
 (defun elk/rg ()
   "Allows you to select a folder to ripgrep."
@@ -621,6 +749,11 @@ If the universal prefix argument is used then will the windows too."
         evil-want-C-i-jump nil
         evil-mode-line-format nil
         evil-undo-system 'undo-fu)
+  ;; It's infuriating that innocuous "beginning of line" or "end of line"
+  ;; errors will abort macros, so suppress them:
+  (setq evil-kbd-macro-suppress-motion-error t)
+  ;; Dont replace text in the kill ring when visual pasting
+  (setq evil-kill-on-visual-paste nil)
   ;; more vim-like behavior
   (setq evil-symbol-word-search t
         evil-vsplit-window-right t
@@ -632,18 +765,11 @@ If the universal prefix argument is used then will the windows too."
   (evil-mode 1)
   (evil-select-search-module 'evil-search-module 'evil-search)
 
-  ;; It's infuriating that innocuous "beginning of line" or "end of line"
-  ;; errors will abort macros, so suppress them:
-  (setq evil-kbd-macro-suppress-motion-error t)
-
   ;; stop copying each visual state move to the clipboard:
   ;; https://github.com/emacs-evil/evil/issues/336
   ;; grokked from:
   ;; http://stackoverflow.com/questions/15873346/elisp-rename-macro
   (advice-add #'evil-visual-update-x-selection :override #'ignore)
-
-  ;; Highlight on yank
-  (advice-add #'evil-yank :around 'elk/evil-yank-highlight)
 
   (evil-set-initial-state 'dashboard-mode 'motion)
   (evil-set-initial-state 'debugger-mode 'motion)
@@ -729,9 +855,9 @@ If the universal prefix argument is used then will the windows too."
 (use-package general
   :config
   (general-create-definer elk/leader-key-def
-    :keymaps '(normal insert visual motion emacs)
+    :states '(normal insert visual motion emacs)
     :prefix "SPC"
-    :global-prefix "M-SPC")
+    :non-normal-prefix "M-SPC")
 
   (general-evil-setup t)
   (add-hook 'after-init-hook #'general-auto-unbind-keys))
@@ -777,9 +903,17 @@ If the universal prefix argument is used then will the windows too."
   "br" '(revert-buffer :which-key "revert buffer"))
 
 (elk/leader-key-def
+  :keymaps 'prog-mode-map
   ;; Code
   "c" '(nil :which-key "code")
+  "cb" 'xref-pop-marker-stack
+  "cc" 'compile
+  "cC" 'recompile
+  "cd" 'xref-find-definitions
   "cf" 'format-all-buffer
+  "cj" 'consult-eglot-symbols
+  "cr" 'eglot-rename
+  "cw" 'delete-trailing-whitespace
   )
 
 (elk/leader-key-def
@@ -799,7 +933,7 @@ If the universal prefix argument is used then will the windows too."
   "eff" '((lambda () (interactive) (find-file "~/.config/fontconfig/fonts.conf")) :which-key "fonts.conf")
   "efi" '((lambda () (interactive) (find-file "~/.config/i3/i3.org")) :which-key "i3.org")
   "efp" '((lambda () (interactive) (find-file "~/.config/polybar/polybar.org")) :which-key "polybar.org")
-  "efs" '((lambda () (interactive) (find-file "~/.config/sxhkd/sxhkd.org")) :which-key "sxhkd.org")
+  "efs" '((lambda () (interactive) (find-file "~/.config/sxhkd/sxhkdrc.org")) :which-key "sxhkdrc.org")
   "efx" '((lambda () (interactive) (find-file "~/.config/x11/x.org")) :which-key "x.org")
 )
 
@@ -887,10 +1021,10 @@ If the universal prefix argument is used then will the windows too."
   ;; Windows
   "w" '(nil :which-key "window")
   "wm" '(elk/toggle-maximize-buffer :which-key "maximize buffer")
-  "wN" '(make-frame :which-key "make frame")
+  "wn" '(make-frame :which-key "make frame")
   "wd" '(evil-window-delete :which-key "delete window")
-  "w-" '(elk/split-window-vertically-and-switch :which-key "split below")
-  "w/" '(elk/split-window-horizontally-and-switch :which-key "split right")
+  "ws" '(elk/split-window-vertically-and-switch :which-key "split below")
+  "wv" '(elk/split-window-horizontally-and-switch :which-key "split right")
   ;;"wr" '(elk-hydra-window/body :which-key "hydra window")
   "wl" '(evil-window-right :which-key "evil-window-right")
   "wh" '(evil-window-left :which-key "evil-window-left")
@@ -917,9 +1051,8 @@ If the universal prefix argument is used then will the windows too."
   :states 'normal
   :keymaps 'org-mode-map
   "t" 'org-todo
-  "<return>" 'org-open-at-point-global
-  "K" 'org-shiftup
-  "J" 'org-shiftdown
+  [return] '+org/dwim-at-point
+  "<return>" '+org/dwim-at-point
   )
 
 (general-def
@@ -1176,6 +1309,9 @@ _q_uit          _e_qualize        _]_forward     ^
 
    ("q" nil))
 
+;; If a popup does happen, don't resize windows to be equal-sized
+(setq even-window-sizes nil)
+
 (use-package company
   :diminish company-mode
   :disabled t
@@ -1393,9 +1529,6 @@ folder, otherwise delete a word"
   (add-hook 'rfn-eshadow-update-overlay-hook #'vertico-directory-tidy)
   (add-hook 'minibuffer-setup-hook #'vertico-repeat-save))
 
-(use-package vertico-posframe
-  :hook (vertico-mode . vertico-posframe-mode))
-
 ;; A few more useful configurations...
 (use-package emacs
   :init
@@ -1495,7 +1628,7 @@ folder, otherwise delete a word"
   :init
   (setq xref-show-xrefs-function       #'consult-xref
         xref-show-definitions-function #'consult-xref)
-  
+
   ;; Optionally configure the register formatting. This improves the register
   ;; preview for `consult-register', `consult-register-load',
   ;; `consult-register-store' and the Emacs built-ins.
@@ -1535,6 +1668,7 @@ folder, otherwise delete a word"
                      consult--source-bookmark consult--source-recent-file
                      consult--source-project-recent-file
                      :preview-key (kbd "C-SPC"))
+
   )
 
 
@@ -1919,6 +2053,20 @@ folder, otherwise delete a word"
   ;; (add-hook 'writeroom-mode-hook (lambda () (setq-local line-spacing 10)))
   )
 
+(use-package evil-goggles
+  :custom-face
+  (evil-goggles-default-face ((t (:inherit 'highlight)))) ;; default is to inherit 'region
+  ;; run `M-x list-faces-display` in a fresh emacs to get a list of faces on your emacs
+  :init
+  (setq evil-goggles-duration 0.1
+        evil-goggles-pulse nil ; too slow
+        ;; evil-goggles provides a good indicator of what has been affected.
+        ;; delete/change is obvious, so I'd rather disable it for these.
+        evil-goggles-enable-delete nil
+        evil-goggles-enable-change nil)
+  :config
+  (evil-goggles-mode))
+
 (use-package org-super-agenda
     :after org
     :config
@@ -2023,8 +2171,9 @@ folder, otherwise delete a word"
     (kbd "f") 'org-agenda-later
     (kbd "b") 'org-agenda-earlier))
 
-(general-def
-  :keymaps 'org-mode-map "C-c t" 'elk/org-done-keep-todo)
+(general-def 'org-mode-map
+  ;; Emacs bindings
+  "C-c t" 'elk/org-done-keep-todo)
 
 (general-def 'visual org-mode-map
   [remap +evil-shift-left] '+evil-org-< ; vnoremap < <gv
@@ -2546,7 +2695,7 @@ folder, otherwise delete a word"
   ;; `org-cite'
   (setq org-cite-global-bibliography citar-bibliography
         ;; Setup export processor; default csl/citeproc-el, with biblatex for latex
-        org-cite-export-processors '((latex biblatex) (t csl))
+        ;; org-cite-export-processors '((latex biblatex) (t csl))
         org-support-shift-select t))
 
 (use-package org-roam-bibtex
@@ -2884,6 +3033,7 @@ folder, otherwise delete a word"
                               "\\*Warnings\\*"
                               "\\*Async Shell Command\\*"
                               help-mode
+                              helpful-mode
                               eldoc-mode
                               compilation-mode))
   :init
@@ -2928,7 +3078,7 @@ folder, otherwise delete a word"
         ("WIP"   . "#1E90FF"))))
 
 (use-package rainbow-delimiters
-  :defer t
+  :commands rainbow-delimiters-mode
   :hook (prog-mode . rainbow-delimiters-mode))
 
 ;; A better python mode (supposedly)
@@ -2973,6 +3123,11 @@ folder, otherwise delete a word"
   "i" '(web-mode-buffer-indent :which-key "web mode indent")
   "c" '(web-mode-fold-or-unfold :which-key "web mode toggle fold")
   ))
+
+(use-package yaml-mode
+  :mode "Procfile\\'"
+  :init
+  (add-hook 'yaml-mode-local-vars-hook #'eglot-ensure 'append))
 
 (use-package sudo-edit
   :defer t
