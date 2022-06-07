@@ -14,29 +14,32 @@
 
 (package-initialize)
 
-(unless (package-installed-p 'use-package)
-  (package-refresh-contents)
-  (package-install 'use-package))
+(unless (package-installed-p 'quelpa)
+  (with-temp-buffer
+    (url-insert-file-contents "https://raw.githubusercontent.com/quelpa/quelpa/master/quelpa.el")
+    (eval-buffer)))
+
+(setq quelpa-update-melpa-p nil)
 
 (eval-when-compile
-  (require 'use-package))
+  (require 'quelpa))
+
+(setq quelpa-upgrade-interval 7)
+(add-hook #'after-init-hook #'quelpa-upgrade-all-maybe)
+
+(quelpa
+ '(quelpa-use-package
+   :fetcher git
+   :url "https://github.com/quelpa/quelpa-use-package.git"))
+
+(setq quelpa-update-melpa-p nil)
+
+(eval-when-compile
+  (require 'quelpa-use-package))
 
 (setq use-package-always-ensure t)
 (setq use-package-verbose nil)
 (setq package-native-compile t)
-
-(use-package quelpa-use-package
-  :demand t
-  :init
-  (setq quelpa-use-package-inhibit-loading-quelpa t)
-  (unless (package-installed-p 'quelpa-use-package)
-    (quelpa
-     '(quelpa-use-package
-       :fetcher git
-       :url "https://github.com/quelpa/quelpa-use-package.git")))
-  :config
-  (setq quelpa-upgrade-interval 7)
-  (add-hook #'after-init-hook #'quelpa-upgrade-all-maybe))
 
 (use-package auto-package-update
   :defer 1
@@ -494,7 +497,6 @@ If the universal prefix argument is used then will the windows too."
   :defer t)
 
 (use-package i3wm-config-mode
-  :quelpa (i3wm-config-mode :fetcher github :repo "Alexander-Miller/i3wm-Config-Mode")
   :defer t)
 
 (defun elk/emacs-i3-windmove (dir)
@@ -1540,7 +1542,8 @@ folder, otherwise delete a word"
   ;; Cleans up path when moving directories with shadowed paths syntax, e.g.
   ;; cleans ~/foo/bar/// to /, and ~/foo/bar/~/ to ~/.
   (add-hook 'rfn-eshadow-update-overlay-hook #'vertico-directory-tidy)
-  (add-hook 'minibuffer-setup-hook #'vertico-repeat-save))
+  ;;(add-hook 'minibuffer-setup-hook #'vertico-repeat-save)
+  )
 
 ;; A few more useful configurations...
 (use-package emacs
@@ -1581,64 +1584,32 @@ folder, otherwise delete a word"
 
 ;; Example configuration for Consult
 (use-package consult
-  ;; Replace bindings. Lazily loaded due by `use-package'.
-  :bind (;; C-c bindings (mode-specific-map)
-         ("C-c h" . consult-history)
-         ("C-c m" . consult-mode-command)
-         ("C-c k" . consult-kmacro)
-         ;; C-x bindings (ctl-x-map)
-         ("C-x M-:" . consult-complex-command)     ;; orig. repeat-complex-command
-         ("C-x b" . consult-buffer)                ;; orig. switch-to-buffer
-         ("C-x 4 b" . consult-buffer-other-window) ;; orig. switch-to-buffer-other-window
-         ("C-x 5 b" . consult-buffer-other-frame)  ;; orig. switch-to-buffer-other-frame
-         ("C-x r b" . consult-bookmark)            ;; orig. bookmark-jump
-         ("C-x p b" . consult-project-buffer)      ;; orig. project-switch-to-buffer
-         ;; Custom M-# bindings for fast register access
-         ("M-#" . consult-register-load)
-         ("M-'" . consult-register-store)          ;; orig. abbrev-prefix-mark (unrelated)
-         ("C-M-#" . consult-register)
-         ;; Other custom bindings
-         ("M-y" . consult-yank-pop)                ;; orig. yank-pop
-         ("<help> a" . consult-apropos)            ;; orig. apropos-command
-         ;; M-g bindings (goto-map)
-         ("M-g e" . consult-compile-error)
-         ("M-g f" . consult-flycheck)               ;; Alternative: consult-flycheck
-         ("M-g g" . consult-goto-line)             ;; orig. goto-line
-         ("M-g M-g" . consult-goto-line)           ;; orig. goto-line
-         ("M-g o" . consult-outline)               ;; Alternative: consult-org-heading
-         ("M-g m" . consult-mark)
-         ("M-g k" . consult-global-mark)
-         ("M-g i" . consult-imenu)
-         ("M-g I" . consult-imenu-multi)
-         ;; M-s bindings (search-map)
-         ("M-s d" . consult-find)
-         ("M-s D" . consult-locate)
-         ("M-s g" . consult-grep)
-         ("M-s G" . consult-git-grep)
-         ("M-s r" . consult-ripgrep)
-         ("M-s l" . consult-line)
-         ("M-s L" . consult-line-multi)
-         ("M-s m" . consult-multi-occur)
-         ("M-s k" . consult-keep-lines)
-         ("M-s u" . consult-focus-lines)
-         ;; Isearch integration
-         ("M-s e" . consult-isearch-history)
-         :map isearch-mode-map
-         ("M-e" . consult-isearch-history)         ;; orig. isearch-edit-string
-         ("M-s e" . consult-isearch-history)       ;; orig. isearch-edit-string
-         ("M-s l" . consult-line)                  ;; needed by consult-line to detect isearch
-         ("M-s L" . consult-line-multi)            ;; needed by consult-line to detect isearch
-         ;; Minibuffer history
-         :map minibuffer-local-map
-         ("M-s" . consult-history)                 ;; orig. next-matching-history-element
-         ("M-r" . consult-history))                ;; orig. previous-matching-history-element
-
+  :quelpa (consult :fetcher github :repo "minad/consult")
+  :defer t
   ;; Enable automatic preview at point in the *Completions* buffer. This is
   ;; relevant when you use the default completion UI.
   :hook (completion-list-mode . consult-preview-at-point-mode)
-
-  ;; The :init configuration is always executed (Not lazy)
   :init
+  (general-def
+    [remap apropos]                       #'consult-apropos
+    [remap bookmark-jump]                 #'consult-bookmark
+    [remap evil-show-marks]               #'consult-mark
+    ;;[remap evil-show-jumps]               #'+vertico/jump-list
+    [remap evil-show-registers]           #'consult-register
+    [remap goto-line]                     #'consult-goto-line
+    [remap imenu]                         #'consult-imenu
+    [remap locate]                        #'consult-locate
+    [remap load-theme]                    #'consult-theme
+    [remap man]                           #'consult-man
+    [remap recentf-open-files]            #'consult-recent-file
+    [remap switch-to-buffer]              #'consult-buffer
+    [remap switch-to-buffer-other-window] #'consult-buffer-other-window
+    [remap switch-to-buffer-other-frame]  #'consult-buffer-other-frame
+    [remap yank-pop]                      #'consult-yank-pop)
+    ;;[remap persp-switch-to-buffer]        #'+vertico/switch-workspace-buffer
+  
+  (advice-add #'multi-occur :override #'consult-multi-occur)
+  
   (setq xref-show-xrefs-function       #'consult-xref
         xref-show-definitions-function #'consult-xref)
 
@@ -1680,10 +1651,7 @@ folder, otherwise delete a word"
                      consult-bookmark consult-recent-file consult-xref
                      consult--source-bookmark consult--source-recent-file
                      consult--source-project-recent-file
-                     :preview-key (kbd "C-SPC"))
-
-  )
-
+                     :preview-key (kbd "C-SPC")))
 
 (use-package consult-dir
   :bind (([remap list-directory] . consult-dir)
@@ -2112,14 +2080,13 @@ folder, otherwise delete a word"
 (setq org-blank-before-new-entry '((heading . nil) (plain-list-item . nil)))
 
 (use-package evil-org
-    :after org
-    :diminish evil-org-mode
-    :config
-    (add-hook 'org-mode-hook 'evil-org-mode)
-    (add-hook 'evil-org-mode-hook
+  :hook (org-mode . evil-org-mode)
+  :diminish evil-org-mode
+  :config
+  (add-hook 'evil-org-mode-hook
             (lambda () (evil-org-set-key-theme)))
-    (require 'evil-org-agenda)
-    (evil-org-agenda-set-keys))
+  (require 'evil-org-agenda)
+  (evil-org-agenda-set-keys))
 
 (use-package org-gcal
     :defer t
@@ -2253,18 +2220,41 @@ folder, otherwise delete a word"
   (push '(":es:" . "" ) prettify-symbols-alist)
   (prettify-symbols-mode 1))
 
+(defun +org-realign-table-maybe-h ()
+  "Auto-align table under cursor."
+  (when (and (org-at-table-p) org-table-may-need-update)
+    (let ((pt (point))
+          (inhibit-message t))
+      (if org-table-may-need-update (org-table-align))
+      (goto-char pt))))
+
+(defun +org-realign-table-maybe-a (&rest _)
+  "Auto-align table under cursor and re-calculate formulas."
+  (when (eq major-mode 'org-mode)
+    (+org-realign-table-maybe-h)))
+
+;; From DOOM Emacs
+(defun +org-enable-auto-reformat-tables-h ()
+  "Realign tables & update formulas when exiting insert mode (`evil-mode').
+Meant for `org-mode-hook'."
+  (when (featurep 'evil)
+    (add-hook 'evil-insert-state-exit-hook #'+org-realign-table-maybe-h nil t)
+    (add-hook 'evil-replace-state-exit-hook #'+org-realign-table-maybe-h nil t)
+    (advice-add #'evil-replace :after #'+org-realign-table-maybe-a)))
+
 (defun elk/org-setup ()
   (org-indent-mode) ;; Keeps org items like text under headings, lists, nicely indented
   (visual-line-mode 1) ;; Nice line wrapping
   (visual-fill-column-mode 1) ;; Make the document centered with 100 words.
-  
+
   (centered-cursor-mode)
-  
+
   ;; (setq header-line-format "") ;; Empty header line, basically adds a blank line on top
   (setq-local line-spacing (+ elk-default-line-spacing 1)))
 
 (use-package org
   :pin gnu
+  :hook (org-mode . +org-enable-auto-reformat-tables-h)
   :hook (org-mode . elk/org-setup)
   :hook (org-mode . elk/prettify-symbols-setup)
   :hook (org-mode . elk/org-font-setup)
