@@ -3389,11 +3389,11 @@ The following snippet sets up a hook for all Org task state changes and then cop
 #+end_src
 ** Mw-thesaurus
 #+BEGIN_SRC emacs-lisp
-  (use-package mw-thesaurus
-    :defer t
-    :config
-    ;; Binds q to quit in mw-thesaurus
-    (add-hook 'mw-thesaurus-mode-hook (lambda () (define-key evil-normal-state-local-map (kbd "q") 'mw-thesaurus--quit))))
+(use-package mw-thesaurus
+  :defer t
+  :config
+  ;; Binds q to quit in mw-thesaurus
+  (add-hook 'mw-thesaurus-mode-hook (lambda () (define-key evil-normal-state-local-map (kbd "q") 'mw-thesaurus--quit))))
 #+END_SRC
 ** Pdf-Tools
 #+BEGIN_SRC emacs-lisp
