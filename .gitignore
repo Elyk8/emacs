@@ -17,6 +17,7 @@ auto-save-list/
 cask/
 ede-projects.el
 elpa/
+qelpa/
 eln-cache/
 network-security.data
 places

@@ -6,10 +6,6 @@
 
 (add-to-list 'package-archives '("melpa" . "https://melpa.org/packages/")) ;; ELPA and NonGNU ELPA are default in Emacs28
 
-;; avoid problems with files newer than their byte-compiled counterparts
-;; it\u2019s better a lower startup than load an outdated and maybe bugged package
-(setq load-prefer-newer t)
-
 ;;(setq gnutls-algorithm-priority "NORMAL:-VERS-TLS1.3") ;; w/o this Emacs freezes when refreshing ELPA
 
 (package-initialize)
@@ -88,13 +84,14 @@
 
 (defcustom elk-doom-modeline-text-height nil "My preferred modeline text height.")
 (defcustom elk-text-height nil "My preferred default text height.")
+(defcustom elk-larger-text nil "Larger text height.")
 (defcustom elk-default-line-spacing 0 "Baseline line spacing.")
-(defcustom elk-fixed-pitch-font "JetBrains Mono Nerd Font" "My preferred fixed monospace font face")
-(defcustom elk-variable-pitch-font "sans" "My preferred variable font face")
 
 (if (eq elk/computer 'gpd)
-    (setq elk-text-height 120)
-  (setq elk-text-height 140))
+    (setq elk-text-height 120
+          elk-larger-text 140)
+  (setq elk-text-height 140
+        elk-larger-text 160))
 
 (if (eq elk/computer 'gpd)
     (setq elk-doom-modeline-text-height 120)
@@ -180,7 +177,7 @@ If run with universal argument C-u, insert org options to make export very plain
 		(insert-buffer-substring old-buffer beg end) ;; Insert desired text to export into temp buffer
 		(org-html-export-as-html) ;; Export to HTML
 		(write-file (concat (make-temp-file "jibemacsorg") ".html")) ;; Write HTML to temp file
-		(jib/open-buffer-file-mac) ;; Use my custom function to open the file (Mac only)
+		(elk/open-buffer-file-mac) ;; Use my custom function to open the file (Mac only)
 		(kill-this-buffer)))))
 
 (defun elk/org-schedule-tomorrow ()
@@ -717,12 +714,6 @@ If the universal prefix argument is used then will the windows too."
 (require 'uniquify)
 (setq uniquify-buffer-name-style 'forward)
 
-;; ENCODING -------------
-(when (fboundp 'set-charset-priority)
-  (set-charset-priority 'unicode))       ; pretty
-(prefer-coding-system 'utf-8)            ; pretty
-(setq locale-coding-system 'utf-8)       ; please
-
 (setq blink-cursor-interval 0.6)
 (blink-cursor-mode 0)
 
@@ -968,6 +959,12 @@ If the universal prefix argument is used then will the windows too."
 ;;"fO" '(jib/open-buffer-file-mac :which-key "open buffer file")
 
 (use-package helpful
+  :general
+  ([remap describe-function] 'helpful-function
+   [remap describe-symbol] 'helpful-symbol
+   [remap describe-variable] 'helpful-variable
+   [remap describe-command] 'helpful-command
+   [remap describe-key] 'helpful-key)
   :config
   (defvar read-symbol-positions-list nil))
 
@@ -1024,7 +1021,7 @@ If the universal prefix argument is used then will the windows too."
   "tT" '(toggle-truncate-lines :which-key "truncate lines")
   "tv" '(visual-line-mode :which-key "visual line mode")
   "tn" '(display-line-numbers-mode :which-key "display line numbers")
-  "ta" '(mixed-pitch-mode :which-key "variable pitch mode")
+  "ta" '(variable-pitch-mode :which-key "variable pitch mode")
   "tc" '(visual-fill-column-mode :which-key "visual fill column mode")
   "tt" '(load-theme :which-key "load theme")
   "tw" '(writeroom-mode :which-key "writeroom-mode")
@@ -1221,7 +1218,7 @@ If the universal prefix argument is used then will the windows too."
   "M-c" 'simpleclip-copy
   "M-u" 'capitalize-dwim ;; Default is upcase-dwim
   "M-U" 'upcase-dwim ;; M-S-u (switch upcase and capitalize)
-  "C-c u" 'jib/split-and-close-sentence
+  "C-c u" 'elk/split-and-close-sentence
   
   ;; Utility ------
   "C-c c" 'org-capture
@@ -1269,8 +1266,8 @@ If the universal prefix argument is used then will the windows too."
 
 ;; This Hydra lets me swich between variable pitch fonts. It turns off mixed-pitch
 ;; WIP
-(defhydra elk-hydra-variable-fonts (:pre (mixed-pitch-mode 0)
-                                     :post (mixed-pitch-mode 1))
+(defhydra elk-hydra-variable-fonts (:pre (variable-pitch-mode 0)
+                                     :post (variable-pitch-mode 1))
   ("t" (set-face-attribute 'variable-pitch nil :family "Times New Roman" :height 160) "Times New Roman")
   ("g" (set-face-attribute 'variable-pitch nil :family "EB Garamond" :height 160 :weight 'normal) "EB Garamond")
   ;; ("r" (set-face-attribute 'variable-pitch nil :font "Roboto" :weight 'medium :height 160) "Roboto")
@@ -1326,58 +1323,6 @@ _q_uit          _e_qualize        _]_forward     ^
 
 ;; If a popup does happen, don't resize windows to be equal-sized
 (setq even-window-sizes nil)
-
-(use-package company
-  :diminish company-mode
-  :disabled t
-  :general
-  (general-define-key :keymaps 'company-active-map
-                      "C-j" 'company-select-next
-                      "C-k" 'company-select-previous)
-  (general-define-key
-   :states 'insert
-   "C-SPC" 'company-complete-common)
-  :init
-  ;; These configurations come from Doom Emacs:
-  (add-hook 'after-init-hook 'global-company-mode)
-  (setq company-minimum-prefix-length 2
-        company-tooltip-limit 14
-        company-tooltip-align-annotations t
-        company-require-match 'never
-        company-global-modes '(not erc-mode message-mode help-mode gud-mode)
-        company-frontends
-        '(company-pseudo-tooltip-frontend  ; always show candidates in overlay tooltip
-          company-echo-metadata-frontend)  ; show selected candidate docs in echo area
-        company-backends '(company-capf company-files company-keywords)
-        company-auto-complete nil
-        company-auto-complete-chars nil
-        company-dabbrev-other-buffers nil
-        company-dabbrev-ignore-case nil
-        company-dabbrev-downcase nil)
-
-  :config
-  (setq company-idle-delay nil
-        company-tooltip-limit 10)
-
-  (add-hook 'company-mode-hook #'evil-normalize-keymaps)
-  :custom-face
-  (company-tooltip ((t (:family "Roboto Mono")))))
-
-
-;; (use-package company-box
-;;   :hook (company-mode . company-box-mode)
-;;   :init
-;;   (setq company-box-icons-alist 'company-box-icons-all-the-icons)
-;;   (setq company-box-icons-elisp
-;;    '((fa_tag :face font-lock-function-name-face) ;; Function
-;;      (fa_cog :face font-lock-variable-name-face) ;; Variable
-;;      (fa_cube :face font-lock-constant-face) ;; Feature
-;;      (md_color_lens :face font-lock-doc-face))) ;; Face
-;;   :config
-;;   (require 'all-the-icons)
-;;   (setf (alist-get 'min-height company-box-frame-parameters) 6)
-;;   (setq company-box-icons-alist 'company-box-icons-all-the-icons)
-;;   )
 
 (use-package corfu
   :general
@@ -1921,7 +1866,6 @@ folder, otherwise delete a word"
   ;;(setq yas-snippet-dirs (list (expand-file-name "snippets" elk/emacs-stuff)))
   (yas-global-mode 1)) ;; or M-x yas-reload-all if you've started YASnippet already.
 
-
 ;; Silences the warning when running a snippet with backticks (runs a command in the snippet)
 ;; I use backtick commands to get the date for org snippets
 (require 'warnings)
@@ -1934,21 +1878,46 @@ folder, otherwise delete a word"
 
 (setq-default line-spacing elk-default-line-spacing)
 
-(set-face-attribute 'default nil :family elk-fixed-pitch-font :weight 'medium :height elk-text-height)
+(set-face-attribute 'default nil
+                    :family "JetBrains Mono"
+                    :weight 'medium
+                    :height elk-text-height)
 
 ;; Float height value (1.0) makes fixed-pitch take height 1.0 * height of default
 ;; This means it will scale along with default when the text is zoomed
-(set-face-attribute 'fixed-pitch nil :font elk-fixed-pitch-font :weight 'regular :height 1.0)
+(set-face-attribute 'fixed-pitch nil
+                    :family "JetBrains Mono"
+                    :weight 'medium
+                    :height elk-text-height)
 
 ;; Height of 160 seems to match perfectly with 12-point on Google Docs
-(set-face-attribute 'variable-pitch nil :family elk-variable-pitch-font :height elk-text-height)
+(set-face-attribute 'variable-pitch nil
+                    :family "Iosevka Aile"
+                    :height elk-larger-text)
 
-(use-package mixed-pitch
-  :defer t
+(defun elk/replace-unicode-font-mapping (block-name old-font new-font)
+  (let* ((block-idx (cl-position-if
+                     (lambda (i) (string-equal (car i) block-name))
+                     unicode-fonts-block-font-mapping))
+         (block-fonts (cadr (nth block-idx unicode-fonts-block-font-mapping)))
+         (updated-block (cl-substitute new-font old-font block-fonts :test 'string-equal)))
+    (setf (cdr (nth block-idx unicode-fonts-block-font-mapping))
+          `(,updated-block))))
+
+(use-package unicode-fonts
+  :disabled t
+  :custom
+  (unicode-fonts-skip-font-groups '(low-quality-glyphs))
   :config
-  (setq mixed-pitch-set-height nil)
-  (dolist (face '(org-date org-priority org-tag org-special-keyword)) ;; Some extra faces I like to be fixed-pitch
-    (add-to-list 'mixed-pitch-fixed-pitch-faces face)))
+  ;; Fix the font mappings to use the right emoji font
+  (mapcar
+   (lambda (block-name)
+     (elk/replace-unicode-font-mapping block-name "Apple Color Emoji" "Noto Color Emoji"))
+   '("Dingbats"
+     "Emoticons"
+     "Miscellaneous Symbols and Pictographs"
+     "Transport and Map Symbols"))
+  (unicode-fonts-setup))
 
 ;; Disables showing system load in modeline, useless anyway
   (setq display-time-default-load-average nil)
@@ -1986,7 +1955,6 @@ folder, otherwise delete a word"
   (all-the-icons-completion-mode))
 
 (use-package doom-themes
-  :after mixed-pitch
   :config
   (doom-themes-visual-bell-config)
   (doom-themes-org-config)
@@ -2009,8 +1977,16 @@ folder, otherwise delete a word"
 (set-face-attribute 'fringe nil :background nil)
 (set-face-attribute 'header-line nil :background nil :inherit 'default)
 
-(add-hook 'prog-mode-hook 'hl-line-mode)
-(add-hook 'prog-mode-hook 'display-line-numbers-mode)
+;; Enable line numbers for some modes
+(dolist (mode '(text-mode-hook
+                prog-mode-hook
+                conf-mode-hook))
+  (add-hook mode (lambda () (display-line-numbers-mode 1)))
+  (add-hook mode (lambda () (hl-line-mode 1))))
+
+;; Override some modes which derive from the above
+(dolist (mode '(org-mode-hook))
+  (add-hook mode (lambda () (display-line-numbers-mode 0))))
 
 ;; This makes emacs transparent
 (set-frame-parameter (selected-frame) 'alpha '(95 . 95))
@@ -2058,12 +2034,12 @@ folder, otherwise delete a word"
 (use-package org-superstar
   :hook (org-mode . org-superstar-mode)
   :config
-  (setq org-superstar-headline-bullets-list '("\u25c9" "\u25cb" "\u25cf" "\u25cb" "\u25cf" "\u25cb" "\u25cf")
+  (setq org-superstar-headline-bullets-list '("◉" "○" "✸" "✿" "✤" "✜" "◆" "▶")
         org-superstar-leading-bullet ?\s
         org-superstar-leading-fallback ?\s
-        ;; org-superstar-item-bullet-alist '((?+ . ?➤) (?- . ?✦)) ; changes +/- symbols in item lists
+        org-superstar-item-bullet-alist '((?+ . ?➤) (?- . ?✦)) ; changes +/- symbols in item lists
         org-superstar-prettify-item-bullets t
-        org-hide-leading-stars t)
+        org-hide-leading-stars nil)
   (setq org-superstar-special-todo-items t  ;; Makes TODO header bullets into boxes
         org-superstar-todo-bullet-alist '(("TODO" . 9744)
                                           ("INPROG-TODO" . 9744)
@@ -2119,7 +2095,7 @@ folder, otherwise delete a word"
   :hook (org-mode . org-auto-tangle-mode))
 
 (use-package ox-reveal
-    :defer 5)
+  :defer 1)
 
 (defun elk/org-download-paste-clipboard (&optional use-default-filename)
   (interactive "P")
@@ -2145,6 +2121,18 @@ folder, otherwise delete a word"
 (eval-after-load 'org
     '(org-load-modules-maybe t))
 
+(require 'org-tempo)
+(add-to-list 'org-structure-template-alist '("sh" . "src sh"))
+(add-to-list 'org-structure-template-alist '("n" . "notes"))
+(add-to-list 'org-structure-template-alist '("el" . "src emacs-lisp"))
+(add-to-list 'org-structure-template-alist '("li" . "src lisp"))
+(add-to-list 'org-structure-template-alist '("sc" . "src scheme"))
+(add-to-list 'org-structure-template-alist '("ts" . "src typescript"))
+(add-to-list 'org-structure-template-alist '("py" . "src python"))
+(add-to-list 'org-structure-template-alist '("go" . "src go"))
+(add-to-list 'org-structure-template-alist '("yaml" . "src yaml"))
+(add-to-list 'org-structure-template-alist '("json" . "src json"))
+
 ;; Org-agenda specific bindings
 (with-eval-after-load 'evil-mode
   (evil-define-key 'motion org-agenda-mode-map
@@ -2161,7 +2149,7 @@ folder, otherwise delete a word"
   )
 
 (defun elk/org-font-setup ()
-  (set-face-attribute 'org-document-title nil :height 1.1) ;; Bigger titles, smaller drawers
+  ;; (set-face-attribute 'org-document-title nil :height 1.1) ;; Bigger titles, smaller drawers
   (set-face-attribute 'org-checkbox-statistics-done nil :inherit 'org-done :foreground "green3") ;; Makes org done checkboxes green
   (set-face-attribute 'org-ellipsis nil :inherit 'shadow :height 0.8) ;; Makes org-ellipsis shadow (blends in better)
   (set-face-attribute 'org-scheduled-today nil :weight 'normal) ;; Removes bold from org-scheduled-today
@@ -2177,16 +2165,36 @@ folder, otherwise delete a word"
   ;; (dolist (face '(org-code org-verbatim org-meta-line))
   ;;   (set-face-attribute `,face nil :inherit 'shadow :inherit 'fixed-pitch))
 
-  ;; Set faces for heading levels
-  (custom-set-faces
-   '(org-level-1 ((t (:inherit outline-1 :height 1.4))))
-   '(org-level-2 ((t (:inherit outline-2 :height 1.3))))
-   '(org-level-3 ((t (:inherit outline-3 :height 1.2))))
-   '(org-level-4 ((t (:inherit outline-4 :height 1.1))))
-   '(org-level-5 ((t (:inherit outline-5 :height 1.0))))
-   )
+  ;; Increase the size of various headings
+  ;; (dolist (face '((org-level-1 . 1.2)
+  ;;                 (org-level-2 . 1.1)
+  ;;                 (org-level-3 . 1.05)
+  ;;                 (org-level-4 . 1.0)
+  ;;                 (org-level-5 . 1.1)
+  ;;                 (org-level-6 . 1.1)
+  ;;                 (org-level-7 . 1.1)
+  ;;                 (org-level-8 . 1.1)))
+  ;;   (set-face-attribute (car face) nil :height (cdr face)))
 
-  (mixed-pitch-mode 1))
+  ;; Make sure org-indent face is available
+  (require 'org-indent)
+
+  ;; Ensure that anything that should be fixed-pitch in Org files appears that way
+  (set-face-attribute 'org-block nil :foreground nil :inherit 'fixed-pitch)
+  (set-face-attribute 'org-table nil  :inherit 'fixed-pitch)
+  (set-face-attribute 'org-formula nil  :inherit 'fixed-pitch)
+  (set-face-attribute 'org-code nil   :inherit '(shadow fixed-pitch))
+  (set-face-attribute 'org-indent nil :inherit '(org-hide fixed-pitch))
+  (set-face-attribute 'org-verbatim nil :inherit '(shadow fixed-pitch))
+  (set-face-attribute 'org-special-keyword nil :inherit '(font-lock-comment-face fixed-pitch))
+  (set-face-attribute 'org-meta-line nil :inherit '(font-lock-comment-face fixed-pitch))
+  (set-face-attribute 'org-checkbox nil :inherit 'fixed-pitch)
+
+  ;; Get rid of the background on column views
+  (set-face-attribute 'org-column nil :background nil)
+  (set-face-attribute 'org-column-title nil :background nil)
+  ;;(variable-pitch-mode 1)
+  )
 
 (defun elk/prettify-symbols-setup ()
   ;; checkboxes
@@ -2263,18 +2271,21 @@ Meant for `org-mode-hook'."
   :diminish org-indent-mode
   :diminish visual-line-mode
   :custom-face
-  (org-level-1 ((t (:inherit outline-1 :height 1.4))))
-  (org-level-2 ((t (:inherit outline-2 :height 1.3))))
-  (org-level-3 ((t (:inherit outline-3 :height 1.2))))
-  (org-level-4 ((t (:inherit outline-4 :height 1.1))))
+  (org-level-1 ((t (:inherit outline-1 :height 1.0))))
+  (org-level-2 ((t (:inherit outline-2 :height 1.0))))
+  (org-level-3 ((t (:inherit outline-3 :height 1.0))))
+  (org-level-4 ((t (:inherit outline-4 :height 1.0))))
   (org-level-5 ((t (:inherit outline-5 :height 1.0))))
+  (org-level-6 ((t (:inherit outline-6 :height 1.0))))
+  (org-level-7 ((t (:inherit outline-7 :height 1.0))))
+  (org-level-8 ((t (:inherit outline-8 :height 1.0))))
   (org-tag ((t (:inherit org-tag :italic t))))
   :config
 
 (setq org-ellipsis " ⬎ ") ;; ▼
 (setq org-src-fontify-natively t) ;; Syntax highlighting in org src blocks
 (setq org-highlight-latex-and-related '(native)) ;; Highlight inline LaTeX
-(setq org-startup-folded 'show2levels) ;; Org files start up folded by default
+(setq org-startup-folded 'content)
 (setq org-image-actual-width nil)
 
 (setq org-cycle-separator-lines 1)
@@ -2302,10 +2313,10 @@ Meant for `org-mode-hook'."
 
 ;; Automatically save and close the org files I most frequently archive to.
 ;; I see no need to keep them open and crowding my buffer list.
-;; Uses my own function jib/save-and-close-this-buffer.
+;; Uses my own function elk/save-and-close-this-buffer.
 ;; (dolist (file '("homework-archive.org_archive" "todo-archive.org_archive"))
 ;;   (advice-add 'org-archive-subtree-default :after
-;;               (lambda () (jib/save-and-close-this-buffer file))))
+;;               (lambda () (elk/save-and-close-this-buffer file))))
 
 (setq counsel-org-tags '("qp" "ec" "st")) ;; Quick-picks, extracurricular, short-term
 
@@ -2484,16 +2495,16 @@ Meant for `org-mode-hook'."
                                                        ))))
 
                 (alltodo "" ((org-agenda-overriding-header "All Tasks:")
-                             (org-super-agenda-groups jib-org-super-agenda-school-groups
+                             (org-super-agenda-groups elk-org-super-agenda-school-groups
                                                       ))))
                ))
 
 (add-to-list 'org-agenda-custom-commands
              '("m" "Agendaless Super zaen view"
                ((alltodo "" ((org-agenda-overriding-header "Agendaless Todo View")
-                             (org-super-agenda-groups (push '(:name "Today's Tasks" ;; jib-org-super-agenda-school-groups, with this added on
+                             (org-super-agenda-groups (push '(:name "Today's Tasks" ;; elk-org-super-agenda-school-groups, with this added on
                                                                     :scheduled today
-                                                                    :deadline today) jib-org-super-agenda-school-groups)
+                                                                    :deadline today) elk-org-super-agenda-school-groups)
                                                       )))))
              )
 ;; Org-super-agenda-mode itself is activated in the use-package block
@@ -2505,7 +2516,6 @@ Meant for `org-mode-hook'."
 (setq org-refile-targets (quote (("~/Dropbox/org/work.org" :maxlevel . 2))))
 (setq org-outline-path-complete-in-steps nil) ; Refile in a single go
 (setq org-refile-use-outline-path t)          ; Show full paths for refilin0
-
 
 (setq org-capture-templates
       '(
@@ -2724,7 +2734,6 @@ Meant for `org-mode-hook'."
   (setq xref-show-definitions-function #'xref-show-definitions-completing-read))
 
 (use-package consult-org-roam
-  :disabled t
   :init
   ;; Activate the minor-mode
   (consult-org-roam-mode 1)
@@ -2747,9 +2756,6 @@ Meant for `org-mode-hook'."
 (use-package centered-cursor-mode :diminish centered-cursor-mode)
 (use-package restart-emacs :defer t)
 (use-package diminish)
-(use-package beacon
-  :commands beacon-mode
-  :hook (after-init-hook . beacon-mode))
 
 (use-package bufler
   :general
@@ -2952,12 +2958,6 @@ Meant for `org-mode-hook'."
   )
 
 (add-hook 'TeX-after-compilation-finished-functions #'TeX-revert-document-buffer) ;; Standard way
-
-(use-package company-auctex
-  :after auctex
-  :init
-  (add-to-list 'company-backends 'company-auctex)
-  (company-auctex-init))
 
 (use-package magit
   :commands (magit magit-status)

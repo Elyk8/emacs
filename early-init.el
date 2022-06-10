@@ -11,6 +11,11 @@
 ;; Don't enable packages at startup
 (setq package-enable-at-startup nil)
 
+;; In noninteractive sessions, prioritize non-byte-compiled source files to
+;; prevent the use of stale byte-code. Otherwise, it saves us a little IO time
+;; to skip the mtime checks on every *.elc file.
+(setq load-prefer-newer noninteractive)
+
 ;; MISC OPTIMIZATIONS ----
 ;;; optimizations (froom Doom's core.el). See that file for descriptions.
 (setq idle-update-delay 1.0)
@@ -32,6 +37,12 @@
   (startup-redirect-eln-cache
    (convert-standard-filename
 	  (expand-file-name  "var/eln-cache/" user-emacs-directory))))
+
+;; ENCODING -------------
+(set-language-environment "UTF-8")
+
+;; set-language-environment sets default-input-method, which is unwanted
+(setq default-input-method nil)
 
 ;; Escape exit everything
 (global-set-key (kbd "<escape>") 'keyboard-escape-quit)
