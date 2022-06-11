@@ -2,6 +2,12 @@
 
 (require 'package)
 
+;; In noninteractive sessions, prioritize non-byte-compiled source files to
+;; prevent the use of stale byte-code. Otherwise, it saves us a little IO time
+;; to skip the mtime checks on every *.elc file.
+(setq load-prefer-newer noninteractive)
+(setq package-native-compile t)
+
 (setq package-user-dir (expand-file-name "elpa" user-emacs-directory))
 
 (add-to-list 'package-archives '("melpa" . "https://melpa.org/packages/")) ;; ELPA and NonGNU ELPA are default in Emacs28
@@ -10,32 +16,16 @@
 
 (package-initialize)
 
-(unless (package-installed-p 'quelpa)
-  (with-temp-buffer
-    (url-insert-file-contents "https://raw.githubusercontent.com/quelpa/quelpa/master/quelpa.el")
-    (eval-buffer)))
-
-(setq quelpa-update-melpa-p nil)
+;; Bootstrap use-package
+(unless (package-installed-p 'use-package)
+  (package-refresh-contents)
+  (package-install 'use-package))
 
 (eval-when-compile
-  (require 'quelpa))
-
-(setq quelpa-upgrade-interval 7)
-(add-hook #'after-init-hook #'quelpa-upgrade-all-maybe)
-
-(quelpa
- '(quelpa-use-package
-   :fetcher git
-   :url "https://github.com/quelpa/quelpa-use-package.git"))
-
-(setq quelpa-update-melpa-p nil)
-
-(eval-when-compile
-  (require 'quelpa-use-package))
+  (require 'use-package))
 
 (setq use-package-always-ensure t)
 (setq use-package-verbose nil)
-(setq package-native-compile t)
 
 (use-package auto-package-update
   :defer 1
@@ -563,13 +553,13 @@ If the universal prefix argument is used then will the windows too."
     ("kill" (evil-quit))
     (- (error command))))
 
-  (setq register-preview-delay 0) ;; Show registers ASAP
+(setq register-preview-delay 0) ;; Show registers ASAP
 
-  ;;(set-register ?i (cons 'file (concat org-directory "/cpb.org")))
-  ;;(set-register ?h (cons 'file (concat org-directory "/work.org")))
-  ;;(set-register ?C (cons 'file (concat jib/emacs-stuff "/jake-emacs/init.org")))
-  ;;(set-register ?A (cons 'file (concat org-directory "/org-archive/homework-archive.org_archive")))
-  ;;(set-register ?T (cons 'file (concat org-directory "/org-archive/todo-archive.org_archive")))
+;;(set-register ?i (cons 'file (concat org-directory "/cpb.org")))
+;;(set-register ?h (cons 'file (concat org-directory "/work.org")))
+;;(set-register ?C (cons 'file (concat jib/emacs-stuff "/jake-emacs/init.org")))
+;;(set-register ?A (cons 'file (concat org-directory "/org-archive/homework-archive.org_archive")))
+;;(set-register ?T (cons 'file (concat org-directory "/org-archive/todo-archive.org_archive")))
 
 ;; Change the user-emacs-directory to keep unwanted things out of ~/.emacs.d
 (setq user-emacs-directory (expand-file-name "~/.cache/emacs/")
@@ -727,27 +717,31 @@ If the universal prefix argument is used then will the windows too."
 ;; How thin the window should be to stop splitting vertically (I think)
 (setq split-width-threshold 80)
 
-  (use-package which-key
-    :diminish which-key-mode
-    :defer 0
-    :custom
-    (which-key-idle-delay 0.2)
-    (which-key-prefix-prefix "+")
-    (which-key-allow-imprecise-window-fit t) ; Comment this if experiencing crashes
-    (which-key-sort-order 'which-key-key-order-alpha)
-    (which-key-sort-uppercase-first nil)
-    (which-key-add-column-padding 1)
-    (which-key-max-display-columns nil)
-    (which-key-min-display-lines 6)
-    (which-key-side-window-slot -10)
-    :config
-    (put 'which-key-replacement-alist 'initial-value which-key-replacement-alist)
-    ;; general improvements to which-key readability
-    (which-key-setup-side-window-bottom)
-    (which-key-mode))
+(use-package which-key
+  :diminish which-key-mode
+  :defer 0
+  :custom
+  (which-key-idle-delay 0.2)
+  (which-key-prefix-prefix "+")
+  (which-key-allow-imprecise-window-fit t) ; Comment this if experiencing crashes
+  (which-key-sort-order 'which-key-key-order-alpha)
+  (which-key-sort-uppercase-first nil)
+  (which-key-add-column-padding 1)
+  (which-key-max-display-columns nil)
+  (which-key-min-display-lines 6)
+  (which-key-side-window-slot -10)
+  :config
+  (set-face-attribute 'which-key-local-map-description-face nil
+                      :weight 'bold)
+  (put 'which-key-replacement-alist 'initial-value which-key-replacement-alist)
+  ;; general improvements to which-key readability
+  (which-key-setup-side-window-bottom)
+  (which-key-mode))
 
 (use-package evil
   :init
+  ;; Make horizontal movement cross lines
+  (setq-default evil-cross-lines t)
   (setq evil-want-fine-undo t
         evil-want-keybinding nil
         evil-want-Y-yank-to-eol t
@@ -885,18 +879,20 @@ If the universal prefix argument is used then will the windows too."
   ;; "Applications"
   "a" '(nil :which-key "applications")
   "ao" '(org-agenda :which-key "org-agenda")
-  ;"am" '(mu4e :which-key "mu4e")
+                                        ;"am" '(mu4e :which-key "mu4e")
   "aC" '(calc :which-key "calc")
   "ac" '(org-capture :which-key "org-capture")
-  ;"aqq" '(org-ql-view :which-key "org-ql-view")
-  ;"aqs" '(org-ql-search :which-key "org-ql-search")
+                                        ;"aqq" '(org-ql-view :which-key "org-ql-view")
+                                        ;"aqs" '(org-ql-search :which-key "org-ql-search")
+  "at" '(vterm-toggle :which-key "toggle vterm popup")
 
   "ab" '(nil :which-key "browse url")
   "abf" '(browse-url-firefox :which-key "firefox")
   "abc" '(browse-url-chrome :which-key "chrome")
-  ;"abx" '(xwidget-webkit-browse-url :which-key "xwidget")
+                                        ;"abx" '(xwidget-webkit-browse-url :which-key "xwidget")
 
-  "ad" '(dired :which-key "dired-jump"))
+  "ad" '(dired :which-key "dired-jump")
+  "aD" '(dired-recent-open :wk "dired history"))
 
 (elk/leader-key-def
   ;; Buffers
@@ -1021,7 +1017,7 @@ If the universal prefix argument is used then will the windows too."
   "tT" '(toggle-truncate-lines :which-key "truncate lines")
   "tv" '(visual-line-mode :which-key "visual line mode")
   "tn" '(display-line-numbers-mode :which-key "display line numbers")
-  "ta" '(variable-pitch-mode :which-key "variable pitch mode")
+  "ta" '(mixed-pitch-mode :which-key "variable pitch mode")
   "tc" '(visual-fill-column-mode :which-key "visual fill column mode")
   "tt" '(load-theme :which-key "load theme")
   "tw" '(writeroom-mode :which-key "writeroom-mode")
@@ -1059,35 +1055,35 @@ If the universal prefix argument is used then will the windows too."
   "I" '(indent-region :which-key "indent-region")
   )
 
-  (general-def
-    :states 'normal
-    :keymaps 'org-mode-map
-    "t" 'org-todo
-    [return] '+org/dwim-at-point
-    "<return>" '+org/dwim-at-point
-    )
+(general-def
+  :states 'normal
+  :keymaps 'org-mode-map
+  "t" 'org-todo
+  [return] '+org/dwim-at-point
+  "<return>" '+org/dwim-at-point
+  )
 
-  (general-def
-    :states '(normal insert emacs)
-    :keymaps 'org-mode-map
-    "M-[" 'org-metaleft
-    "M-]" 'org-metaright
-    "C-M-=" 'ap/org-count-words
-    "s-r" 'org-refile
-    )
+(general-def
+  :states '(normal insert emacs)
+  :keymaps 'org-mode-map
+  "M-[" 'org-metaleft
+  "M-]" 'org-metaright
+  "C-M-=" 'ap/org-count-words
+  "s-r" 'org-refile
+  )
 
-  ;; Org-src - when editing an org source block
-  (general-def
-    :prefix ","
-    :states 'motion
-    :keymaps 'org-src-mode-map
-    "b" '(nil :which-key "org src")
-    "bc" 'org-edit-src-abort
-    "bb" 'org-edit-src-exit
-    )
+;; Org-src - when editing an org source block
+(general-def
+  :prefix ","
+  :states 'motion
+  :keymaps 'org-src-mode-map
+  "b" '(nil :which-key "org src")
+  "bc" 'org-edit-src-abort
+  "bb" 'org-edit-src-exit
+  )
 
-  (with-eval-after-load 'org
-    (define-key org-src-mode-map (kbd "C-c C-c") #'org-edit-src-exit))
+(with-eval-after-load 'org
+  (define-key org-src-mode-map (kbd "C-c C-c") #'org-edit-src-exit))
 
 (general-def
   :prefix ","
@@ -1206,12 +1202,6 @@ If the universal prefix argument is used then will the windows too."
   "∫" 'consult-buffer ;; option-b
   "s-o" 'elk-hydra-window/body
   
-  ;; Remapping normal help features to use Counsel version
-  "C-h v" 'describe-variable
-  "C-h o" 'describe-symbol
-  "C-h f" 'describe-function
-  "C-h F" 'describe-face
-  
   ;; Editing ------
   "M-v" 'simpleclip-paste
   "M-V" 'evil-paste-after ;; shift-paste uses the internal clipboard
@@ -1220,23 +1210,26 @@ If the universal prefix argument is used then will the windows too."
   "M-U" 'upcase-dwim ;; M-S-u (switch upcase and capitalize)
   "C-c u" 'elk/split-and-close-sentence
   
+  ;; Zooming ------
+  "C--" '(lambda () (interactive) (text-scale-decrease 1)) ;; Decrease font size
+  "C-=" '(lambda () (interactive) (text-scale-increase 1)) ;; Increase font size
+  
   ;; Utility ------
   "C-c c" 'org-capture
   "C-c a" 'org-agenda
   ;; "C-s" 'counsel-grep-or-swiper ;; Large files will use grep (faster)
   ;;"s-\"" 'ispell-word ;; that's super-shift-'
-  "M-+" 'elk/calc-speaking-time
-)
+  "M-+" 'elk/calc-speaking-time)
 
 ;; Non-insert mode keymaps
 (general-def
   :states '(normal visual motion)
-  "C--" '(lambda () (interactive) (text-scale-decrease 1)) ;; Decrease font size
-  "C-=" '(lambda () (interactive) (text-scale-increase 1)) ;; Increase font size
   "gc" 'comment-line
   "gC" 'comment-dwim
-  "j" 'evil-next-visual-line ;; I prefer visual line navigation
-  "k" 'evil-previous-visual-line ;; ""
+  "H" 'evil-first-non-blank
+  "L" 'evil-org-end-of-line
+  "k" 'evil-previous-visual-line ;; I prefer visual line navigation
+  "j" 'evil-next-visual-line ; ""
   "|" '(lambda () (interactive) (org-agenda nil "n")) ;; Opens my n custom org-super-agenda view
   "C-|" '(lambda () (interactive) (org-agenda nil "m")) ;; Opens my m custom org-super-agenda view
   )
@@ -1266,8 +1259,8 @@ If the universal prefix argument is used then will the windows too."
 
 ;; This Hydra lets me swich between variable pitch fonts. It turns off mixed-pitch
 ;; WIP
-(defhydra elk-hydra-variable-fonts (:pre (variable-pitch-mode 0)
-                                     :post (variable-pitch-mode 1))
+(defhydra elk-hydra-variable-fonts (:pre (mixed-pitch-mode 0)
+                                     :post (mixed-pitch-mode 1))
   ("t" (set-face-attribute 'variable-pitch nil :family "Times New Roman" :height 160) "Times New Roman")
   ("g" (set-face-attribute 'variable-pitch nil :family "EB Garamond" :height 160 :weight 'normal) "EB Garamond")
   ;; ("r" (set-face-attribute 'variable-pitch nil :font "Roboto" :weight 'medium :height 160) "Roboto")
@@ -1435,7 +1428,7 @@ _q_uit          _e_qualize        _]_forward     ^
   ;;(add-to-list 'completion-at-point-functions #'cape-dabbrev)
   ;;(add-to-list 'completion-at-point-functions #'cape-history)
   (add-to-list 'completion-at-point-functions #'cape-keyword)
-  ;;(add-to-list 'completion-at-point-functions #'cape-tex)
+  (add-to-list 'completion-at-point-functions #'cape-tex)
   ;;(add-to-list 'completion-at-point-functions #'cape-sgml)
   ;;(add-to-list 'completion-at-point-functions #'cape-rfc1345)
   ;;(add-to-list 'completion-at-point-functions #'cape-abbrev)
@@ -1457,7 +1450,6 @@ folder, otherwise delete a word"
     (backward-kill-word arg)))
 
 (use-package vertico
-  :quelpa (vertico :fetcher github :repo "minad/vertico")
   ;; Special recipe to load extensions conveniently
   :general
   (:keymaps 'vertico-map
@@ -1488,6 +1480,10 @@ folder, otherwise delete a word"
   ;; cleans ~/foo/bar/// to /, and ~/foo/bar/~/ to ~/.
   (add-hook 'rfn-eshadow-update-overlay-hook #'vertico-directory-tidy)
   ;;(add-hook 'minibuffer-setup-hook #'vertico-repeat-save)
+
+  ;; These commands are problematic and automatically show the *Completions* buffer
+  (advice-add #'tmm-add-prompt :after #'minibuffer-hide-completions)
+
   )
 
 ;; A few more useful configurations...
@@ -1529,7 +1525,6 @@ folder, otherwise delete a word"
 
 ;; Example configuration for Consult
 (use-package consult
-  :quelpa (consult :fetcher github :repo "minad/consult")
   :defer t
   ;; Enable automatic preview at point in the *Completions* buffer. This is
   ;; relevant when you use the default completion UI.
@@ -1551,10 +1546,10 @@ folder, otherwise delete a word"
     [remap switch-to-buffer-other-window] #'consult-buffer-other-window
     [remap switch-to-buffer-other-frame]  #'consult-buffer-other-frame
     [remap yank-pop]                      #'consult-yank-pop)
-    ;;[remap persp-switch-to-buffer]        #'+vertico/switch-workspace-buffer
-  
+  ;;[remap persp-switch-to-buffer]        #'+vertico/switch-workspace-buffer
+
   (advice-add #'multi-occur :override #'consult-multi-occur)
-  
+
   (setq xref-show-xrefs-function       #'consult-xref
         xref-show-definitions-function #'consult-xref)
 
@@ -1596,7 +1591,32 @@ folder, otherwise delete a word"
                      consult-bookmark consult-recent-file consult-xref
                      consult--source-bookmark consult--source-recent-file
                      consult--source-project-recent-file
-                     :preview-key (kbd "C-SPC")))
+                     :preview-key (kbd "C-SPC"))
+
+  (defvar +vertico--consult-org-source
+    (list :name     "Org Buffer"
+          :category 'buffer
+          :narrow   ?o
+          :hidden   t
+          :face     'consult-buffer
+          :history  'buffer-name-history
+          :state    #'consult--buffer-state
+          :new
+          (lambda (name)
+            (with-current-buffer (get-buffer-create name)
+              (insert "#+title: " name "\n\n")
+              (org-mode)
+              (consult--buffer-action (current-buffer))))
+          :items
+          (lambda ()
+            (mapcar #'buffer-name
+                    (if (featurep 'org)
+                        (org-buffer-list)
+                      (seq-filter
+                       (lambda (x)
+                         (eq (buffer-local-value 'major-mode x) 'org-mode))
+                       (buffer-list)))))))
+  (add-to-list 'consult-buffer-sources '+vertico--consult-org-source 'append))
 
 (use-package consult-dir
   :bind (([remap list-directory] . consult-dir)
@@ -1662,14 +1682,14 @@ folder, otherwise delete a word"
           search-ring regexp-search-ring)) ; persist searches
   (savehist-mode))
 
-  (use-package marginalia
-    :after vertico
-    :custom
-    (marginalia-annotators '(marginalia-annotaators-heavy marginalia-annotators-light nil))
-    :init
-    (marginalia-mode)
-    :config
-    (add-hook 'marginalia-mode-hook #'all-the-icons-completion-marginalia-setup))
+(use-package marginalia
+  :after vertico
+  :custom
+  (marginalia-annotators '(marginalia-annotaators-heavy marginalia-annotators-light nil))
+  :init
+  (marginalia-mode)
+  :config
+  (add-hook 'marginalia-mode-hook #'all-the-icons-completion-marginalia-setup))
 
 (use-package smartparens
   :diminish smartparens-mode
@@ -1700,7 +1720,6 @@ folder, otherwise delete a word"
   ;; Don't do square-bracket space-expansion where it doesn't make sense to
   (sp-local-pair '(emacs-lisp-mode org-mode markdown-mode gfm-mode)
                  "[" nil :post-handlers '(:rem ("| " "SPC")))
-
 
   (dolist (brace '("(" "{" "["))
     (sp-pair brace nil
@@ -1743,10 +1762,10 @@ folder, otherwise delete a word"
 (use-package flyspell-correct-popup
   :after flyspell-correct)
 
-  (use-package evil-anzu
-    :after evil
-    :config
-    (global-anzu-mode 1))
+(use-package evil-anzu
+  :after evil
+  :config
+  (global-anzu-mode 1))
 
 (use-package simpleclip
   :config
@@ -1789,8 +1808,14 @@ folder, otherwise delete a word"
     "H" 'dired-omit-mode
     "l" 'dired-single-buffer))
 
-(use-package dired-single
-  :after dired)
+(use-package dired-recent
+  :after dired
+  :commands dired-recent-open
+  :config
+  (dired-recent-mode)
+  (general-define-key
+   :keymaps 'dired-recent-mode-map
+   "C-x C-d" nil))
 
 (use-package all-the-icons-dired
   :hook (dired-mode . all-the-icons-dired-mode)
@@ -1812,50 +1837,52 @@ folder, otherwise delete a word"
   (evil-collection-define-key 'normal 'dired-mode-map
     "H" 'dired-hide-dotfiles-mode))
 
-(use-package dired-rainbow
+(use-package diredfl
+  :after dired
+  :config
+  (diredfl-global-mode 1))
+
+(use-package dired-sidebar
+  :after dired
+  :commands (dired-sidebar-toggle-sidebar)
+  :init
+  (general-define-key
+   :keymaps '(normal override global)
+   "C-n" 'dired-sidebar-toggle-sidebar)
+  :config
+  (defun elk/dired-sidebar-setup ()
+    (toggle-truncate-lines 1)
+    (display-line-numbers-mode -1)
+    (setq-local dired-subtree-use-backgrounds nil))
+
+  (general-define-key
+   :keymaps 'dired-sidebar-mode-map
+   :states '(normal emacs)
+   "l" 'dired-sidebar-find-file
+   "h" 'dired-sidebar-up-directory
+   "=" 'dired-narrow)
+  (add-hook 'dired-sidebar-mode-hook #'elk/dired-sidebar-setup))
+
+(use-package super-save
+  :diminish super-save-mode
   :defer 2
   :config
-  (dired-rainbow-define-chmod directory "#6cb2eb" "d.*")
-  (dired-rainbow-define html "#eb5286" ("css" "less" "sass" "scss" "htm" "html" "jhtm" "mht" "eml" "mustache" "xhtml"))
-  (dired-rainbow-define xml "#f2d024" ("xml" "xsd" "xsl" "xslt" "wsdl" "bib" "json" "msg" "pgn" "rss" "yaml" "yml" "rdata"))
-  (dired-rainbow-define document "#9561e2" ("docm" "doc" "docx" "odb" "odt" "pdb" "pdf" "ps" "rtf" "djvu" "epub" "odp" "ppt" "pptx"))
-  (dired-rainbow-define markdown "#ffed4a" ("org" "etx" "info" "markdown" "md" "mkd" "nfo" "pod" "rst" "tex" "textfile" "txt"))
-  (dired-rainbow-define database "#6574cd" ("xlsx" "xls" "csv" "accdb" "db" "mdb" "sqlite" "nc"))
-  (dired-rainbow-define media "#de751f" ("mp3" "mp4" "mkv" "MP3" "MP4" "avi" "mpeg" "mpg" "flv" "ogg" "mov" "mid" "midi" "wav" "aiff" "flac"))
-  (dired-rainbow-define image "#f66d9b" ("tiff" "tif" "cdr" "gif" "ico" "jpeg" "jpg" "png" "psd" "eps" "svg"))
-  (dired-rainbow-define log "#c17d11" ("log"))
-  (dired-rainbow-define shell "#f6993f" ("awk" "bash" "bat" "sed" "sh" "zsh" "vim"))
-  (dired-rainbow-define interpreted "#38c172" ("py" "ipynb" "rb" "pl" "t" "msql" "mysql" "pgsql" "sql" "r" "clj" "cljs" "scala" "js"))
-  (dired-rainbow-define compiled "#4dc0b5" ("asm" "cl" "lisp" "el" "c" "h" "c++" "h++" "hpp" "hxx" "m" "cc" "cs" "cp" "cpp" "go" "f" "for" "ftn" "f90" "f95" "f03" "f08" "s" "rs" "hi" "hs" "pyc" ".java"))
-  (dired-rainbow-define executable "#8cc4ff" ("exe" "msi"))
-  (dired-rainbow-define compressed "#51d88a" ("7z" "zip" "bz2" "tgz" "txz" "gz" "xz" "z" "Z" "jar" "war" "ear" "rar" "sar" "xpi" "apk" "xz" "tar"))
-  (dired-rainbow-define packaged "#faad63" ("deb" "rpm" "apk" "jad" "jar" "cab" "pak" "pk3" "vdf" "vpk" "bsp"))
-  (dired-rainbow-define encrypted "#ffed4a" ("gpg" "pgp" "asc" "bfe" "enc" "signature" "sig" "p12" "pem"))
-  (dired-rainbow-define fonts "#6cb2eb" ("afm" "fon" "fnt" "pfb" "pfm" "ttf" "otf"))
-  (dired-rainbow-define partition "#e3342f" ("dmg" "iso" "bin" "nrg" "qcow" "toast" "vcd" "vmdk" "bak"))
-  (dired-rainbow-define vc "#0074d9" ("git" "gitignore" "gitattributes" "gitmodules"))
-  (dired-rainbow-define-chmod executable-unix "#38c172" "-.*x.*"))
+  (setq super-save-auto-save-when-idle t)
+  (setq super-save-idle-duration 10) ;; after 5 seconds of not typing autosave
+  (setq super-save-triggers ;; Functions after which buffers are saved (switching window, for example)
+        '(evil-window-next evil-window-prev balance-windows other-window))
+  (super-save-mode +1))
 
-  (use-package super-save
-    :diminish super-save-mode
-    :defer 2
-    :config
-    (setq super-save-auto-save-when-idle t)
-    (setq super-save-idle-duration 10) ;; after 5 seconds of not typing autosave
-    (setq super-save-triggers ;; Functions after which buffers are saved (switching window, for example)
-          '(evil-window-next evil-window-prev balance-windows other-window))
-    (super-save-mode +1))
+;; After super-save autosaves, wait __ seconds and then clear the buffer. I don't like
+;; the save message just sitting in the echo area.
+(defun elk-clear-echo-area-timer ()
+  (run-at-time "2 sec" nil (lambda () (message " "))))
 
-  ;; After super-save autosaves, wait __ seconds and then clear the buffer. I don't like
-  ;; the save message just sitting in the echo area.
-  (defun elk-clear-echo-area-timer ()
-    (run-at-time "2 sec" nil (lambda () (message " "))))
+(advice-add 'super-save-command :after 'elk-clear-echo-area-timer)
 
-  (advice-add 'super-save-command :after 'elk-clear-echo-area-timer)
-
-  (use-package saveplace
-    :init (setq save-place-limit 100)
-    :config (save-place-mode))
+(use-package saveplace
+  :init (setq save-place-limit 100)
+  :config (save-place-mode))
 
 (use-package yasnippet
   :diminish yas-minor-mode
@@ -1880,20 +1907,27 @@ folder, otherwise delete a word"
 
 (set-face-attribute 'default nil
                     :family "JetBrains Mono"
-                    :weight 'medium
+                    :weight 'regular
                     :height elk-text-height)
 
 ;; Float height value (1.0) makes fixed-pitch take height 1.0 * height of default
 ;; This means it will scale along with default when the text is zoomed
 (set-face-attribute 'fixed-pitch nil
                     :family "JetBrains Mono"
-                    :weight 'medium
+                    :weight 'regular
                     :height elk-text-height)
 
 ;; Height of 160 seems to match perfectly with 12-point on Google Docs
 (set-face-attribute 'variable-pitch nil
                     :family "Iosevka Aile"
                     :height elk-larger-text)
+
+(use-package mixed-pitch
+  :defer t
+  :config
+  (setq mixed-pitch-set-height nil)
+  (dolist (face '(org-date org-priority org-tag org-special-keyword)) ;; Some extra faces I like to be fixed-pitch
+    (add-to-list 'mixed-pitch-fixed-pitch-faces face)))
 
 (defun elk/replace-unicode-font-mapping (block-name old-font new-font)
   (let* ((block-idx (cl-position-if
@@ -1919,7 +1953,7 @@ folder, otherwise delete a word"
      "Transport and Map Symbols"))
   (unicode-fonts-setup))
 
-  ;; Disables showing system load in modeline, useless anyway
+;; Disables showing system load in modeline, useless anyway
   (setq display-time-default-load-average nil)
 
   (line-number-mode)
@@ -1968,7 +2002,7 @@ folder, otherwise delete a word"
   (org-scheduled-previously ((t (:background "red")))))
 
 ;; Load the theme here
-(elk/load-theme 'doom-dracula)
+(elk/load-theme 'doom-dark+)
 
 (setq-default fringes-outside-margins nil)
 (setq-default indicate-buffer-boundaries nil) ;; Otherwise shows a corner icon on the edge
@@ -2149,51 +2183,18 @@ folder, otherwise delete a word"
   )
 
 (defun elk/org-font-setup ()
-  ;; (set-face-attribute 'org-document-title nil :height 1.1) ;; Bigger titles, smaller drawers
-  (set-face-attribute 'org-checkbox-statistics-done nil :inherit 'org-done :foreground "green3") ;; Makes org done checkboxes green
-  (set-face-attribute 'org-ellipsis nil :inherit 'shadow :height 0.8) ;; Makes org-ellipsis shadow (blends in better)
-  (set-face-attribute 'org-scheduled-today nil :weight 'normal) ;; Removes bold from org-scheduled-today
-  (set-face-attribute 'org-super-agenda-header nil :inherit 'org-agenda-structure :weight 'bold) ;; Bolds org-super-agenda headers
-  (set-face-attribute 'org-scheduled-previously nil :background "red") ;; Bolds org-super-agenda headers
+  (custom-theme-set-faces
+   'user
+   ;; '(org-level-4 ((t (:inherit t :height 1.1))))
+   ;; '(org-level-3 ((t (:inherit t :height 1.25))))
+   ;; '(org-level-2 ((t (:inherit t :height 1.5))))
+   ;; '(org-level-1 ((t (:inherit t :height 1.75))))
+   '(org-block ((t (:foreground nil))))
+   '(org-tag ((t (:inherit org-tag :italic t))))
+   '(org-ellipsis ((t (:inherit shadow :height 0.8))))
+   '(org-link ((t (:foreground "royal blue" :underline t)))))
 
-  ;; (set-face-attribute 'org-drawer nil :inherit 'fixed-pitch :inherit 'shadow :height 0.6 :foreground nil) ;; Makes org-drawer way smaller
-
-  ;; Here I set things that need it to be fixed-pitch, just in case the font I am using isn't monospace.
-  ;; (dolist (face '(org-list-dt org-tag org-todo org-table org-checkbox org-priority org-date org-verbatim org-special-keyword))
-  ;;   (set-face-attribute `,face nil :inherit 'fixed-pitch))
-
-  ;; (dolist (face '(org-code org-verbatim org-meta-line))
-  ;;   (set-face-attribute `,face nil :inherit 'shadow :inherit 'fixed-pitch))
-
-  ;; Increase the size of various headings
-  ;; (dolist (face '((org-level-1 . 1.2)
-  ;;                 (org-level-2 . 1.1)
-  ;;                 (org-level-3 . 1.05)
-  ;;                 (org-level-4 . 1.0)
-  ;;                 (org-level-5 . 1.1)
-  ;;                 (org-level-6 . 1.1)
-  ;;                 (org-level-7 . 1.1)
-  ;;                 (org-level-8 . 1.1)))
-  ;;   (set-face-attribute (car face) nil :height (cdr face)))
-
-  ;; Make sure org-indent face is available
-  (require 'org-indent)
-
-  ;; Ensure that anything that should be fixed-pitch in Org files appears that way
-  (set-face-attribute 'org-block nil :foreground nil :inherit 'fixed-pitch)
-  (set-face-attribute 'org-table nil  :inherit 'fixed-pitch)
-  (set-face-attribute 'org-formula nil  :inherit 'fixed-pitch)
-  (set-face-attribute 'org-code nil   :inherit '(shadow fixed-pitch))
-  (set-face-attribute 'org-indent nil :inherit '(org-hide fixed-pitch))
-  (set-face-attribute 'org-verbatim nil :inherit '(shadow fixed-pitch))
-  (set-face-attribute 'org-special-keyword nil :inherit '(font-lock-comment-face fixed-pitch))
-  (set-face-attribute 'org-meta-line nil :inherit '(font-lock-comment-face fixed-pitch))
-  (set-face-attribute 'org-checkbox nil :inherit 'fixed-pitch)
-
-  ;; Get rid of the background on column views
-  (set-face-attribute 'org-column nil :background nil)
-  (set-face-attribute 'org-column-title nil :background nil)
-  ;;(variable-pitch-mode 1)
+  ;; (mixed-pitch-mode 1)
   )
 
 (defun elk/prettify-symbols-setup ()
@@ -2270,16 +2271,6 @@ Meant for `org-mode-hook'."
   :hook (org-capture-mode . evil-insert-state) ;; Start org-capture in Insert state by default
   :diminish org-indent-mode
   :diminish visual-line-mode
-  :custom-face
-  (org-level-1 ((t (:inherit outline-1 :height 1.0))))
-  (org-level-2 ((t (:inherit outline-2 :height 1.0))))
-  (org-level-3 ((t (:inherit outline-3 :height 1.0))))
-  (org-level-4 ((t (:inherit outline-4 :height 1.0))))
-  (org-level-5 ((t (:inherit outline-5 :height 1.0))))
-  (org-level-6 ((t (:inherit outline-6 :height 1.0))))
-  (org-level-7 ((t (:inherit outline-7 :height 1.0))))
-  (org-level-8 ((t (:inherit outline-8 :height 1.0))))
-  (org-tag ((t (:inherit org-tag :italic t))))
   :config
 
 (setq org-ellipsis " ⬎ ") ;; ▼
@@ -2318,280 +2309,285 @@ Meant for `org-mode-hook'."
 ;;   (advice-add 'org-archive-subtree-default :after
 ;;               (lambda () (elk/save-and-close-this-buffer file))))
 
-  (setq counsel-org-tags '("qp" "ec" "st")) ;; Quick-picks, extracurricular, short-term
+(setq counsel-org-tags '("qp" "ec" "st")) ;; Quick-picks, extracurricular, short-term
 
-  (setq org-tag-faces '(
-                        ("bv" . "dark slate blue")
-                        ("sp" . "purple3")
-                        ("ch" . "PaleTurquoise3")
-                        ("cl" . "chartreuse4")
-                        ("es" . "brown3")
-                        ("Weekly" . "SteelBlue1")
-                        ("Robo" . "IndianRed2")
-                        ("Misc" . "tan1")
-                        ("qp" . "RosyBrown1") ;; Quick-picks
-                        ("ec" . "PaleGreen3") ;; Extracurricular
-                        ("st" . "DimGrey") ;; Near-future (aka short term) todo
-                        ))
+(setq org-tag-faces '(
+                      ("bv" . "dark slate blue")
+                      ("sp" . "purple3")
+                      ("ch" . "PaleTurquoise3")
+                      ("cl" . "chartreuse4")
+                      ("es" . "brown3")
+                      ("Weekly" . "SteelBlue1")
+                      ("Robo" . "IndianRed2")
+                      ("Misc" . "tan1")
+                      ("qp" . "RosyBrown1") ;; Quick-picks
+                      ("ec" . "PaleGreen3") ;; Extracurricular
+                      ("st" . "DimGrey") ;; Near-future (aka short term) todo
+                      ))
 
-  ;; (setq org-tags-column -64)
-  (setq org-tags-column 1)
+;; (setq org-tags-column -64)
+(setq org-tags-column 1)
 
-  (setq org-todo-keywords '((type
-                             "TODO(t)" "INPROG-TODO(i)" "HW(h)" "STUDY" "SOMEDAY"
-                             "READ(r)" "PROJ(p)" "CONTACT(c)"
-                             "|" "DONE(d)" "CANCELLED(C)")))
+(setq org-todo-keywords '((type
+                           "TODO(t)" "INPROG-TODO(i)" "HW(h)" "STUDY" "SOMEDAY"
+                           "READ(r)" "PROJ(p)" "CONTACT(c)"
+                           "|" "DONE(d)" "CANCELLED(C)")))
 
-  (setq org-todo-keyword-faces '(("TODO" nil :foreground "orange1" :inherit fixed-pitch :weight medium)
-                                 ("HW" nil :foreground "coral1" :inherit fixed-pitch :weight medium)
-                                 ("STUDY" nil :foreground "plum3" :inherit fixed-pitch :weight medium)
-                                 ("SOMEDAY" nil :foreground "steel blue" :inherit fixed-pitch)
-                                 ("CONTACT" nil :foreground "LightSalmon2" :inherit fixed-pitch :weight medium)
-                                 ("READ" nil :foreground "MediumPurple3" :inherit fixed-pitch :weight medium)
-                                 ("PROJ" nil :foreground "aquamarine3" :inherit fixed-pitch :weight medium)
+(setq org-todo-keyword-faces '(("TODO" nil :foreground "orange1" :inherit fixed-pitch :weight medium)
+                               ("HW" nil :foreground "coral1" :inherit fixed-pitch :weight medium)
+                               ("STUDY" nil :foreground "plum3" :inherit fixed-pitch :weight medium)
+                               ("SOMEDAY" nil :foreground "steel blue" :inherit fixed-pitch)
+                               ("CONTACT" nil :foreground "LightSalmon2" :inherit fixed-pitch :weight medium)
+                               ("READ" nil :foreground "MediumPurple3" :inherit fixed-pitch :weight medium)
+                               ("PROJ" nil :foreground "aquamarine3" :inherit fixed-pitch :weight medium)
 
-                                 ("INPROG-TODO" nil :foreground "orange1" :inherit fixed-pitch :weight medium)
+                               ("INPROG-TODO" nil :foreground "orange1" :inherit fixed-pitch :weight medium)
 
-                                 ("DONE" nil :foreground "LawnGreen" :inherit fixed-pitch :weight medium)
-                                 ("CANCELLED" nil :foreground "dark red" :inherit fixed-pitch :weight medium)))
+                               ("DONE" nil :foreground "LawnGreen" :inherit fixed-pitch :weight medium)
+                               ("CANCELLED" nil :foreground "dark red" :inherit fixed-pitch :weight medium)))
 
-  (setq org-lowest-priority ?F)  ;; Gives us priorities A through F
-  (setq org-default-priority ?E) ;; If an item has no priority, it is considered [#D].
+(setq org-lowest-priority ?F)  ;; Gives us priorities A through F
+(setq org-default-priority ?E) ;; If an item has no priority, it is considered [#D].
 
-  (setq org-priority-faces
-        '((65 nil :inherit fixed-pitch :foreground "red2" :weight medium)
-          (66 . "Gold1")
-          (67 . "Goldenrod2")
-          (68 . "PaleTurquoise3")
-          (69 . "DarkSlateGray4")
-          (70 . "PaleTurquoise4")))
+(setq org-priority-faces
+      '((65 nil :inherit fixed-pitch :foreground "red2" :weight medium)
+        (66 . "Gold1")
+        (67 . "Goldenrod2")
+        (68 . "PaleTurquoise3")
+        (69 . "DarkSlateGray4")
+        (70 . "PaleTurquoise4")))
 
-  ;; Org-Babel
-  (org-babel-do-load-languages
-   'org-babel-load-languages
-   '(
-     (python . t)
-     (shell . t)
-     (gnuplot . t)
-     (emacs-lisp . t)
-     ))
+;; Org-Babel
+(org-babel-do-load-languages
+ 'org-babel-load-languages
+ '(
+   (python . t)
+   (shell . t)
+   (gnuplot . t)
+   (emacs-lisp . t)
+   ))
 
-  (use-package gnuplot)
+;; Asynchronous src block execution
+(use-package ob-async
+  :config
+  (setq ob-async-no-async-languages-alist '("python" "hy" "jupyter-python" "jupyter-octave" "restclient")))
 
-  ;; Don't prompt before running code in org
-  (setq org-confirm-babel-evaluate nil)
-  (setq python-shell-completion-native-enable nil)
+(use-package gnuplot)
 
-  ;; How to open buffer when calling `org-edit-special'.
-  (setq org-src-window-setup 'current-window)
+;; Don't prompt before running code in org
+(setq org-confirm-babel-evaluate nil)
+(setq python-shell-completion-native-enable nil)
 
-  (setq org-habit-preceding-days 6)
-  (setq org-habit-following-days 6)
-  (setq org-habit-show-habits-only-for-today nil)
-  (setq org-habit-today-glyph ?⍟) ;;‖
-  (setq org-habit-completed-glyph ?✓)
-  (setq org-habit-graph-column 40)
+;; How to open buffer when calling `org-edit-special'.
+(setq org-src-window-setup 'current-window)
 
-  ;; Uses custom time stamps
-  (setq org-time-stamp-custom-formats '("<%A, %B %d, %Y" . "<%m/%d/%y %a %I:%M %p>"))
+(setq org-habit-preceding-days 6)
+(setq org-habit-following-days 6)
+(setq org-habit-show-habits-only-for-today nil)
+(setq org-habit-today-glyph ?⍟) ;;‖
+(setq org-habit-completed-glyph ?✓)
+(setq org-habit-graph-column 40)
 
-  (setq org-agenda-restore-windows-after-quit t)
+;; Uses custom time stamps
+(setq org-time-stamp-custom-formats '("<%A, %B %d, %Y" . "<%m/%d/%y %a %I:%M %p>"))
 
-  ;; Only show upcoming deadlines for tomorrow or the day after tomorrow. By default it shows
-  ;; 14 days into the future, which seems excessive.
-  (setq org-deadline-warning-days 2)
-  ;; If something is done, don't show it's deadline
-  (setq org-agenda-skip-deadline-if-done t)
-  ;; If something is done, don't show when it's scheduled for
-  (setq org-agenda-skip-scheduled-if-done t)
-  ;; If something is scheduled, don't tell me it is due soon
-  (setq org-agenda-skip-deadline-prewarning-if-scheduled t)
+(setq org-agenda-restore-windows-after-quit t)
 
-
-  (setq org-agenda-timegrid-use-ampm 1)
-
-  ;; (setq org-agenda-time-grid '((daily today require-timed)
-  ;;                              (800 900 1000 1100 1200 1300 1400 1500 1600 1700)
-  ;;                              "        "
-  ;; 							 "----------------"))
-
-  (setq org-agenda-time-grid nil) ;; I've decided to disable the time grid. 2021-09-22.
-
-  (setq org-agenda-block-separator 8213) ;; Unicode: ―
-  (setq org-agenda-current-time-string "<----------------- Now")
-  (setq org-agenda-scheduled-leaders '("" ""))
-  ;; note: maybe some day I want to use org-agenda-deadline-leaders
-
-  (setq org-agenda-prefix-format '((agenda . " %i %-1:i%?-2t% s")
-                                   (todo . "   ")
-                                   (tags . " %i %-12:c")
-                                   (search . " %i %-12:c")))
-
-  ;; https://stackoverflow.com/questions/58820073/s-in-org-agenda-prefix-format-doesnt-display-dates-in-the-todo-view
-  ;; something to look into
-
-  (setq org-agenda-custom-commands nil)
-
-  (setq elk-org-super-agenda-school-groups
-                                '(
-                                  (:name "Overdue"
-                                         :discard (:tag "habit") ;; No habits in this todo view
-                                         :face (:background "red")
-                                         :scheduled past
-                                         :deadline past
-                                         :order 2)
-                                  (:name "Important"
-                                         :and (:todo "TODO" :priority "A") ;; Homework doesn't count here
-                                         :todo "CONTACT"
-                                         :order 3)
-                                  (:name "Short-term Todo"
-                                         :tag "st"
-                                         :order 4)
-                                  (:name "Personal"
-                                         :category "personal"
-                                         :order 40)
-                                  (:name "Someday"
-                                         :todo "SOMEDAY"
-                                         :order 30)
-                                  (:name "Homework"
-                                         :todo ("HW" "READ")
-                                         :order 5)
-                                  (:name "Studying"
-                                         :todo "STUDY"
-                                         :order 7)
-                                  (:name "Quick Picks"
-                                         :tag "qp"
-                                         :order 11)
-                                  (:name "Projects"
-                                         :todo "PROJ"
-                                         :order 12)
-                                  (:name "Weekly"
-                                         :tag "weekly"
-                                         :order 15)
-                                  (:name "Extracurricular"
-                                         :discard (:todo "SOMEDAY")
-                                         :tag "ec"
-                                         :order 13)
-                                  (:name "Todo"
-                                         :discard (:category "personal")
-                                         :todo ("TODO" "INPROG-TODO")
-                                         :order 20)))
-
-  (add-to-list 'org-agenda-custom-commands
-               '("n" "Super zaen view"
-                 ((agenda "" ((org-agenda-span 'day) (org-agenda-overriding-header "Today's Agenda:")
-                              (org-super-agenda-groups '(
-                                                         (:name "Schedule"
-                                                                :time-grid t
-                                                                :order 1)
-                                                         (:name "Tasks"
-                                                                ;; :discard (:not (:scheduled today))
-                                                                ;; :discard (:deadline today)
-                                                                :scheduled t
-                                                                :order 2)
-                                                         (:name "Unscheduled Tasks"
-                                                                :deadline t
-                                                                :order 3)
-                                                         ))))
-
-                  (alltodo "" ((org-agenda-overriding-header "All Tasks:")
-                               (org-super-agenda-groups elk-org-super-agenda-school-groups
-                                                        ))))
-                 ))
-
-  (add-to-list 'org-agenda-custom-commands
-               '("m" "Agendaless Super zaen view"
-                 ((alltodo "" ((org-agenda-overriding-header "Agendaless Todo View")
-                               (org-super-agenda-groups (push '(:name "Today's Tasks" ;; elk-org-super-agenda-school-groups, with this added on
-                                                                      :scheduled today
-                                                                      :deadline today) elk-org-super-agenda-school-groups)
-                                                        )))))
-               )
-  ;; Org-super-agenda-mode itself is activated in the use-package block
-
-  ;; By default an org-capture/refile will save a bookmark. This
-  ;; disables that and keeps my bookmark list how I want it.
-  (setq org-bookmark-names-plist nil)
-
-  (setq org-refile-targets (quote (("~/Dropbox/org/work.org" :maxlevel . 2))))
-  (setq org-outline-path-complete-in-steps nil) ; Refile in a single go
-  (setq org-refile-use-outline-path t)          ; Show full paths for refilin0
-
-  (setq org-capture-templates
-        '(
-          ("n" "CPB Note" entry (file+headline "~/Dropbox/org/cpb.org" "Refile")
-           "** Note: %? @ %U" :empty-lines 0)
-
-          ("w" "Work Todo Entries")
-              ("we" "No Time" entry (file "~/Dropbox/org/work.org")
-               "** %^{Type|TODO|HW|READ|PROJ} %^{Todo title} %?" :prepend t :empty-lines-before 0)
-
-              ("ws" "Scheduled" entry (file "~/Dropbox/org/work.org")
-               "** %^{Type|TODO|HW|READ|PROJ} %^{Todo title}\nSCHEDULED: %^t%?" :prepend t :empty-lines-before 0)
-
-              ("wd" "Deadline" entry (file "~/Dropbox/org/work.org")
-               "** %^{Type|TODO|HW|READ|PROJ} %^{Todo title}\nDEADLINE: %^t%?" :prepend t :empty-lines-before 0)
-
-              ("ww" "Scheduled & deadline" entry (file "~/Dropbox/org/work.org")
-               "** %^{Type|TODO|HW|READ|PROJ} %^{Todo title}\nSCHEDULED: %^t DEADLINE: %^t %?" :prepend t :empty-lines-before 0)
-          ))
-
-  (setq org-export-backends '(ascii beamer html latex md odt))
-
-  (setq org-export-with-broken-links t)
-  (setq org-export-with-smart-quotes t)
-  (setq org-export-allow-bind-keywords t)
-
-  ;; From https://stackoverflow.com/questions/23297422/org-mode-timestamp-format-when-exported
-  (defun org-export-filter-timestamp-remove-brackets (timestamp backend info)
-    "removes relevant brackets from a timestamp"
-    (cond
-     ((org-export-derived-backend-p backend 'latex)
-      (replace-regexp-in-string "[<>]\\|[][]" "" timestamp))
-     ((org-export-derived-backend-p backend 'html)
-      (replace-regexp-in-string "&[lg]t;\\|[][]" "" timestamp))))
+;; Only show upcoming deadlines for tomorrow or the day after tomorrow. By default it shows
+;; 14 days into the future, which seems excessive.
+(setq org-deadline-warning-days 2)
+;; If something is done, don't show it's deadline
+(setq org-agenda-skip-deadline-if-done t)
+;; If something is done, don't show when it's scheduled for
+(setq org-agenda-skip-scheduled-if-done t)
+;; If something is scheduled, don't tell me it is due soon
+(setq org-agenda-skip-deadline-prewarning-if-scheduled t)
 
 
-  ;; HTML-specific
-  (setq org-html-validation-link nil) ;; No validation button on HTML exports
+(setq org-agenda-timegrid-use-ampm 1)
 
-  ;; LaTeX Specific
-  (eval-after-load 'ox '(add-to-list
-                         'org-export-filter-timestamp-functions
-                         'org-export-filter-timestamp-remove-brackets))
+;; (setq org-agenda-time-grid '((daily today require-timed)
+;;                              (800 900 1000 1100 1200 1300 1400 1500 1600 1700)
+;;                              "        "
+;; 							 "----------------"))
 
-  (use-package ox-hugo
-    :defer 2
-    :after ox
-    :config
-    (setq org-hugo-base-dir "~/Dropbox/Projects/cpb"))
+(setq org-agenda-time-grid nil) ;; I've decided to disable the time grid. 2021-09-22.
 
-  (setq org-latex-listings t) ;; Uses listings package for code exports
-  (setq org-latex-compiler "xelatex") ;; XeLaTex rather than pdflatex
+(setq org-agenda-block-separator 8213) ;; Unicode: ―
+(setq org-agenda-current-time-string "<----------------- Now")
+(setq org-agenda-scheduled-leaders '("" ""))
+;; note: maybe some day I want to use org-agenda-deadline-leaders
 
-  ;; not sure what this is, look into it
-  ;; '(org-latex-active-timestamp-format "\\texttt{%s}")
-  ;; '(org-latex-inactive-timestamp-format "\\texttt{%s}")
+(setq org-agenda-prefix-format '((agenda . " %i %-1:i%?-2t% s")
+                                 (todo . "   ")
+                                 (tags . " %i %-12:c")
+                                 (search . " %i %-12:c")))
 
-  ;; LaTeX Classes
-  (with-eval-after-load 'ox-latex
-    (add-to-list 'org-latex-classes
-                 '("org-plain-latex" ;; I use this in base class in all of my org exports.
-                   "\\documentclass{extarticle}
-           [NO-DEFAULT-PACKAGES]
-           [PACKAGES]
-           [EXTRA]"
-                   ("\\section{%s}" . "\\section*{%s}")
-                   ("\\subsection{%s}" . "\\subsection*{%s}")
-                   ("\\subsubsection{%s}" . "\\subsubsection*{%s}")
-                   ("\\paragraph{%s}" . "\\paragraph*{%s}")
-                   ("\\subparagraph{%s}" . "\\subparagraph*{%s}")))
-    )
+;; https://stackoverflow.com/questions/58820073/s-in-org-agenda-prefix-format-doesnt-display-dates-in-the-todo-view
+;; something to look into
+
+(setq org-agenda-custom-commands nil)
+
+(setq elk-org-super-agenda-school-groups
+                              '(
+                                (:name "Overdue"
+                                       :discard (:tag "habit") ;; No habits in this todo view
+                                       :face (:background "red")
+                                       :scheduled past
+                                       :deadline past
+                                       :order 2)
+                                (:name "Important"
+                                       :and (:todo "TODO" :priority "A") ;; Homework doesn't count here
+                                       :todo "CONTACT"
+                                       :order 3)
+                                (:name "Short-term Todo"
+                                       :tag "st"
+                                       :order 4)
+                                (:name "Personal"
+                                       :category "personal"
+                                       :order 40)
+                                (:name "Someday"
+                                       :todo "SOMEDAY"
+                                       :order 30)
+                                (:name "Homework"
+                                       :todo ("HW" "READ")
+                                       :order 5)
+                                (:name "Studying"
+                                       :todo "STUDY"
+                                       :order 7)
+                                (:name "Quick Picks"
+                                       :tag "qp"
+                                       :order 11)
+                                (:name "Projects"
+                                       :todo "PROJ"
+                                       :order 12)
+                                (:name "Weekly"
+                                       :tag "weekly"
+                                       :order 15)
+                                (:name "Extracurricular"
+                                       :discard (:todo "SOMEDAY")
+                                       :tag "ec"
+                                       :order 13)
+                                (:name "Todo"
+                                       :discard (:category "personal")
+                                       :todo ("TODO" "INPROG-TODO")
+                                       :order 20)))
+
+(add-to-list 'org-agenda-custom-commands
+             '("n" "Super zaen view"
+               ((agenda "" ((org-agenda-span 'day) (org-agenda-overriding-header "Today's Agenda:")
+                            (org-super-agenda-groups '(
+                                                       (:name "Schedule"
+                                                              :time-grid t
+                                                              :order 1)
+                                                       (:name "Tasks"
+                                                              ;; :discard (:not (:scheduled today))
+                                                              ;; :discard (:deadline today)
+                                                              :scheduled t
+                                                              :order 2)
+                                                       (:name "Unscheduled Tasks"
+                                                              :deadline t
+                                                              :order 3)
+                                                       ))))
+
+                (alltodo "" ((org-agenda-overriding-header "All Tasks:")
+                             (org-super-agenda-groups elk-org-super-agenda-school-groups
+                                                      ))))
+               ))
+
+(add-to-list 'org-agenda-custom-commands
+             '("m" "Agendaless Super zaen view"
+               ((alltodo "" ((org-agenda-overriding-header "Agendaless Todo View")
+                             (org-super-agenda-groups (push '(:name "Today's Tasks" ;; elk-org-super-agenda-school-groups, with this added on
+                                                                    :scheduled today
+                                                                    :deadline today) elk-org-super-agenda-school-groups)
+                                                      )))))
+             )
+;; Org-super-agenda-mode itself is activated in the use-package block
+
+;; By default an org-capture/refile will save a bookmark. This
+;; disables that and keeps my bookmark list how I want it.
+(setq org-bookmark-names-plist nil)
+
+(setq org-refile-targets (quote (("~/Dropbox/org/work.org" :maxlevel . 2))))
+(setq org-outline-path-complete-in-steps nil) ; Refile in a single go
+(setq org-refile-use-outline-path t)          ; Show full paths for refilin0
+
+(setq org-capture-templates
+      '(
+        ("n" "CPB Note" entry (file+headline "~/Dropbox/org/cpb.org" "Refile")
+         "** Note: %? @ %U" :empty-lines 0)
+
+        ("w" "Work Todo Entries")
+            ("we" "No Time" entry (file "~/Dropbox/org/work.org")
+             "** %^{Type|TODO|HW|READ|PROJ} %^{Todo title} %?" :prepend t :empty-lines-before 0)
+
+            ("ws" "Scheduled" entry (file "~/Dropbox/org/work.org")
+             "** %^{Type|TODO|HW|READ|PROJ} %^{Todo title}\nSCHEDULED: %^t%?" :prepend t :empty-lines-before 0)
+
+            ("wd" "Deadline" entry (file "~/Dropbox/org/work.org")
+             "** %^{Type|TODO|HW|READ|PROJ} %^{Todo title}\nDEADLINE: %^t%?" :prepend t :empty-lines-before 0)
+
+            ("ww" "Scheduled & deadline" entry (file "~/Dropbox/org/work.org")
+             "** %^{Type|TODO|HW|READ|PROJ} %^{Todo title}\nSCHEDULED: %^t DEADLINE: %^t %?" :prepend t :empty-lines-before 0)
+        ))
+
+(setq org-export-backends '(ascii beamer html latex md odt))
+
+(setq org-export-with-broken-links t)
+(setq org-export-with-smart-quotes t)
+(setq org-export-allow-bind-keywords t)
+
+;; From https://stackoverflow.com/questions/23297422/org-mode-timestamp-format-when-exported
+(defun org-export-filter-timestamp-remove-brackets (timestamp backend info)
+  "removes relevant brackets from a timestamp"
+  (cond
+   ((org-export-derived-backend-p backend 'latex)
+    (replace-regexp-in-string "[<>]\\|[][]" "" timestamp))
+   ((org-export-derived-backend-p backend 'html)
+    (replace-regexp-in-string "&[lg]t;\\|[][]" "" timestamp))))
+
+
+;; HTML-specific
+(setq org-html-validation-link nil) ;; No validation button on HTML exports
+
+;; LaTeX Specific
+(eval-after-load 'ox '(add-to-list
+                       'org-export-filter-timestamp-functions
+                       'org-export-filter-timestamp-remove-brackets))
+
+(use-package ox-hugo
+  :defer 2
+  :after ox
+  :config
+  (setq org-hugo-base-dir "~/Dropbox/Projects/cpb"))
+
+(setq org-latex-listings t) ;; Uses listings package for code exports
+(setq org-latex-compiler "xelatex") ;; XeLaTex rather than pdflatex
+
+;; not sure what this is, look into it
+;; '(org-latex-active-timestamp-format "\\texttt{%s}")
+;; '(org-latex-inactive-timestamp-format "\\texttt{%s}")
+
+;; LaTeX Classes
+(with-eval-after-load 'ox-latex
+  (add-to-list 'org-latex-classes
+               '("org-plain-latex" ;; I use this in base class in all of my org exports.
+                 "\\documentclass{extarticle}
+         [NO-DEFAULT-PACKAGES]
+         [PACKAGES]
+         [EXTRA]"
+                 ("\\section{%s}" . "\\section*{%s}")
+                 ("\\subsection{%s}" . "\\subsection*{%s}")
+                 ("\\subsubsection{%s}" . "\\subsubsection*{%s}")
+                 ("\\paragraph{%s}" . "\\paragraph*{%s}")
+                 ("\\subparagraph{%s}" . "\\subparagraph*{%s}")))
+  )
 
 (setq org-clock-mode-line-total 'current) ;; Show only timer from current clock session in modeline
 (setq org-attach-id-dir ".org-attach/")
 
-  ) ;; This parenthesis ends the org use-package.
+) ;; This parenthesis ends the org use-package.
 
 (use-package org-roam
   :init
@@ -2864,23 +2860,23 @@ Meant for `org-mode-hook'."
 (use-package elfeed
   :commands elfeed
   :general
-  (general-def
-    :states 'motion
-    :keymaps 'elfeed-search-mode-map
-    "r" #'elfeed-search-update--force
-    (kbd "RET") #'elfeed-search-show-entry
-    (kbd "M-RET") #'elfeed-search-browse-url
+  (:states 'motion
+           :keymaps 'elfeed-search-mode-map
+           "r" #'elfeed-search-update--force
+           (kbd "RET") #'elfeed-search-show-entry
+           (kbd "M-RET") #'elfeed-search-browse-url
 
-    "gr" #'elfeed-search-update--force
-    "gR" #'elfeed-search-fetch
+           "gr" #'elfeed-search-update--force
+           "gR" #'elfeed-search-fetch
 
-    "v" nil
-    "v" #'elfeed-view-mpv
-    "t" #'elfeed-w3m-open
-    "w" #'elfeed-eww-open
-    "f" nil
-    "f" #'elfeed-firefox-open
-    "c" #'elfeed-chromium-open)
+           "v" nil
+           "v" #'elfeed-view-mpv
+           "t" #'elfeed-w3m-open
+           "w" #'elfeed-eww-open
+           "f" nil
+           "f" #'elfeed-firefox-open
+           "c" nil
+           "c" #'elfeed-chromium-open)
   (general-def
     :states 'motion
     :keymaps 'elfeed-show-mode-map
@@ -2912,52 +2908,57 @@ Meant for `org-mode-hook'."
   :config
   (elfeed-org))
 
-  (use-package auctex
-    :defer t
-    :init
-    (setq TeX-engine 'xetex ;; Use XeTeX
-          latex-run-command "xetex")
+(use-package elfeed-summary
+  :commands elfeed-summary
+  :config
+  (setq elfeed-summary-filter-by-title t))
 
-    (setq TeX-parse-self t ; parse on load
-          TeX-auto-save t  ; parse on save
-          ;; Use directories in a hidden away folder for AUCTeX files.
-          TeX-auto-local (concat user-emacs-directory "auctex/auto/")
-          TeX-style-local (concat user-emacs-directory "auctex/style/")
+(use-package auctex
+  :defer t
+  :init
+  (setq TeX-engine 'xetex ;; Use XeTeX
+        latex-run-command "xetex")
 
-          TeX-source-correlate-mode t
-          TeX-source-correlate-method 'synctex
+  (setq TeX-parse-self t ; parse on load
+        TeX-auto-save t  ; parse on save
+        ;; Use directories in a hidden away folder for AUCTeX files.
+        TeX-auto-local (concat user-emacs-directory "auctex/auto/")
+        TeX-style-local (concat user-emacs-directory "auctex/style/")
 
-          TeX-show-compilation nil
+        TeX-source-correlate-mode t
+        TeX-source-correlate-method 'synctex
 
-          ;; Don't start the Emacs server when correlating sources.
-          TeX-source-correlate-start-server nil
+        TeX-show-compilation nil
 
-          ;; Automatically insert braces after sub/superscript in `LaTeX-math-mode'.
-          TeX-electric-sub-and-superscript t
-          ;; Just save, don't ask before each compilation.
-          TeX-save-query nil)
+        ;; Don't start the Emacs server when correlating sources.
+        TeX-source-correlate-start-server nil
 
-    ;; To use pdfview with auctex:
-    (setq TeX-view-program-selection '((output-pdf "PDF Tools"))
-          TeX-view-program-list '(("PDF Tools" TeX-pdf-tools-sync-view))
-          TeX-source-correlate-start-server t)
-    :general
-    (general-define-key
-      :prefix ","
-      :states 'normal
-      :keymaps 'LaTeX-mode-map
-      "" nil
-      "a" '(TeX-command-run-all :which-key "TeX run all")
-      "c" '(TeX-command-master :which-key "TeX-command-master")
-      "c" '(TeX-command-master :which-key "TeX-command-master")
-      "e" '(LaTeX-environment :which-key "Insert environment")
-      "s" '(LaTeX-section :which-key "Insert section")
-      "m" '(TeX-insert-macro :which-key "Insert macro")
-      )
+        ;; Automatically insert braces after sub/superscript in `LaTeX-math-mode'.
+        TeX-electric-sub-and-superscript t
+        ;; Just save, don't ask before each compilation.
+        TeX-save-query nil)
 
+  ;; To use pdfview with auctex:
+  (setq TeX-view-program-selection '((output-pdf "PDF Tools"))
+        TeX-view-program-list '(("PDF Tools" TeX-pdf-tools-sync-view))
+        TeX-source-correlate-start-server t)
+  :general
+  (general-define-key
+    :prefix ","
+    :states 'normal
+    :keymaps 'LaTeX-mode-map
+    "" nil
+    "a" '(TeX-command-run-all :which-key "TeX run all")
+    "c" '(TeX-command-master :which-key "TeX-command-master")
+    "c" '(TeX-command-master :which-key "TeX-command-master")
+    "e" '(LaTeX-environment :which-key "Insert environment")
+    "s" '(LaTeX-section :which-key "Insert section")
+    "m" '(TeX-insert-macro :which-key "Insert macro")
     )
 
-  (add-hook 'TeX-after-compilation-finished-functions #'TeX-revert-document-buffer) ;; Standard way
+  )
+
+(add-hook 'TeX-after-compilation-finished-functions #'TeX-revert-document-buffer) ;; Standard way
 
 (use-package magit
   :commands (magit magit-status)
@@ -2987,40 +2988,39 @@ Meant for `org-mode-hook'."
   ;; Binds q to quit in mw-thesaurus
   (add-hook 'mw-thesaurus-mode-hook (lambda () (define-key evil-normal-state-local-map (kbd "q") 'mw-thesaurus--quit))))
 
-  (use-package pdf-tools
-    :defer t
-    :mode  ("\\.pdf\\'" . pdf-view-mode)
-    :config
-    (pdf-loader-install)
-    (setq-default pdf-view-display-size 'fit-height)
-    (setq pdf-view-continuous nil) ;; Makes it so scrolling down to the bottom/top of a page doesn't switch to the next page
-    (setq pdf-view-midnight-colors '("#ffffff" . "#121212" )) ;; I use midnight mode as dark mode, dark mode doesn't seem to work
-    :general
-    (general-define-key :states 'motion :keymaps 'pdf-view-mode-map
-                        "j" 'pdf-view-next-line-or-next-page
-                        "k" 'pdf-view-previous-line-or-previous-page
+(use-package pdf-tools
+  :magic ("%PDF" . pdf-view-mode)
+  :config
+  (pdf-loader-install :no-query)
+  (setq-default pdf-view-display-size 'fit-height)
+  (setq pdf-view-continuous nil) ;; Makes it so scrolling down to the bottom/top of a page doesn't switch to the next page
+  (setq pdf-view-midnight-colors '("#ffffff" . "#121212" )) ;; I use midnight mode as dark mode, dark mode doesn't seem to work
+  :general
+  (general-define-key :states 'motion :keymaps 'pdf-view-mode-map
+                      "j" 'pdf-view-next-line-or-next-page
+                      "k" 'pdf-view-previous-line-or-previous-page
 
-                        "C-j" 'pdf-view-next-line-or-next-page
-                        "C-k" 'pdf-view-previous-line-or-previous-page
+                      "C-j" 'pdf-view-next-line-or-next-page
+                      "C-k" 'pdf-view-previous-line-or-previous-page
 
-                        ;; Arrows for movement as well
-                        (kbd "<down>") 'pdf-view-next-line-or-next-page
-                        (kbd "<up>") 'pdf-view-previous-line-or-previous-page
+                      ;; Arrows for movement as well
+                      (kbd "<down>") 'pdf-view-next-line-or-next-page
+                      (kbd "<up>") 'pdf-view-previous-line-or-previous-page
 
-                        (kbd "<left>") 'image-backward-hscroll
-                        (kbd "<right>") 'image-forward-hscroll
+                      (kbd "<left>") 'image-backward-hscroll
+                      (kbd "<right>") 'image-forward-hscroll
 
-                        "H" 'pdf-view-fit-height-to-window
-                        "0" 'pdf-view-fit-height-to-window
-                        "W" 'pdf-view-fit-width-to-window
-                        "=" 'pdf-view-enlarge
-                        "-" 'pdf-view-shrink
+                      "H" 'pdf-view-fit-height-to-window
+                      "0" 'pdf-view-fit-height-to-window
+                      "W" 'pdf-view-fit-width-to-window
+                      "=" 'pdf-view-enlarge
+                      "-" 'pdf-view-shrink
 
-                        "q" 'quit-window
-                        "Q" 'kill-this-buffer
-                        "g" 'revert-buffer
-                        )
-    )
+                      "q" 'quit-window
+                      "Q" 'kill-this-buffer
+                      "g" 'revert-buffer
+                      )
+  )
 
 (use-package popper
   :general
@@ -3066,19 +3066,18 @@ Meant for `org-mode-hook'."
 (use-package format-all
   :commands format-all-buffer format-all-mode)
 
-  (use-package rainbow-mode
-    :defer t)
+(use-package rainbow-mode
+  :defer t)
 
 
-  (use-package hl-todo
-    :defer t
-    :hook (prog-mode . hl-todo-mode)
-    :config
-    (setq hl-todo-keyword-faces
-        '(("TODO"   . "#FF0000")
-          ("FIXME"  . "#FF4500")
-          ("DEBUG"  . "#A020F0")
-          ("WIP"   . "#1E90FF"))))
+(use-package hl-todo
+  :hook (prog-mode . hl-todo-mode)
+  :config
+  (setq hl-todo-keyword-faces
+      '(("TODO"   . "#FF0000")
+        ("FIXME"  . "#FF4500")
+        ("DEBUG"  . "#A020F0")
+        ("WIP"   . "#1E90FF"))))
 
 (use-package rainbow-delimiters
   :commands rainbow-delimiters-mode
@@ -3086,8 +3085,9 @@ Meant for `org-mode-hook'."
 
 ;; A better python mode (supposedly)
 (use-package python-mode
-  :hook (python-mode . eglot-ensure)
-  :defer t)
+  :mode ("\\.py\\'" . python-mode)
+  :interpreter ("python" . python-mode)
+  :hook (python-mode . eglot-ensure))
 
 ;; Using my virtual environments
 (use-package pyvenv
@@ -3109,23 +3109,21 @@ Meant for `org-mode-hook'."
 ;;   (setq elpy-rpc-virtualenv-path 'current)
 ;;   (advice-add 'python-mode :before 'elpy-enable))
 
-  (use-package web-mode
-    :defer t
-    :init
-    (add-to-list 'auto-mode-alist '("\\.html\\'" . web-mode)) ;; Open .html files in web-mode
-    :config
-    (setq web-mode-enable-current-element-highlight t
-          web-mode-enable-current-column-highlight t)
+(use-package web-mode
+  :mode ("\\.html\\'" . web-mode) ;; Open .html files in web-mode
+  :config
+  (setq web-mode-enable-current-element-highlight t
+        web-mode-enable-current-column-highlight t)
 
-    :general
-    (general-def
-    :prefix ","
-    :states 'motion
-    :keymaps 'web-mode-map
-    "" nil
-    "i" '(web-mode-buffer-indent :which-key "web mode indent")
-    "c" '(web-mode-fold-or-unfold :which-key "web mode toggle fold")
-    ))
+  :general
+  (general-def
+  :prefix ","
+  :states 'motion
+  :keymaps 'web-mode-map
+  "" nil
+  "i" '(web-mode-buffer-indent :which-key "web mode indent")
+  "c" '(web-mode-fold-or-unfold :which-key "web mode toggle fold")
+  ))
 
 (use-package yaml-mode
   :mode "Procfile\\'"
@@ -3137,39 +3135,32 @@ Meant for `org-mode-hook'."
   :commands sudo-edit sudo-edit-find-file)
 
 (use-package vterm
-  :commands vterm)
-
-(use-package multi-vterm
-  :commands (multi-vterm)
+  :commands vterm-mode vterm vterm-other-window
+  :hook (vterm-mode . hide-mode-line-mode)
   :config
-  (add-hook 'vterm-mode-hook
-			(lambda ()
-			  (setq-local evil-insert-state-cursor 'box)
-			  (evil-insert-state)))
-  (define-key vterm-mode-map [return]                      #'vterm-send-return)
-  (setq vterm-keymap-exceptions nil)
-  (evil-define-key 'insert vterm-mode-map (kbd "C-e")      #'vterm--self-insert)
-  (evil-define-key 'insert vterm-mode-map (kbd "C-f")      #'vterm--self-insert)
-  (evil-define-key 'insert vterm-mode-map (kbd "C-a")      #'vterm--self-insert)
-  (evil-define-key 'insert vterm-mode-map (kbd "C-v")      #'vterm--self-insert)
-  (evil-define-key 'insert vterm-mode-map (kbd "C-b")      #'vterm--self-insert)
-  (evil-define-key 'insert vterm-mode-map (kbd "C-w")      #'vterm--self-insert)
-  (evil-define-key 'insert vterm-mode-map (kbd "C-u")      #'vterm--self-insert)
-  (evil-define-key 'insert vterm-mode-map (kbd "C-d")      #'vterm--self-insert)
-  (evil-define-key 'insert vterm-mode-map (kbd "C-n")      #'vterm--self-insert)
-  (evil-define-key 'insert vterm-mode-map (kbd "C-m")      #'vterm--self-insert)
-  (evil-define-key 'insert vterm-mode-map (kbd "C-p")      #'vterm--self-insert)
-  (evil-define-key 'insert vterm-mode-map (kbd "C-j")      #'vterm--self-insert)
-  (evil-define-key 'insert vterm-mode-map (kbd "C-k")      #'vterm--self-insert)
-  (evil-define-key 'insert vterm-mode-map (kbd "C-r")      #'vterm--self-insert)
-  (evil-define-key 'insert vterm-mode-map (kbd "C-t")      #'vterm--self-insert)
-  (evil-define-key 'insert vterm-mode-map (kbd "C-g")      #'vterm--self-insert)
-  (evil-define-key 'insert vterm-mode-map (kbd "C-c")      #'vterm--self-insert)
-  (evil-define-key 'insert vterm-mode-map (kbd "C-SPC")    #'vterm--self-insert)
-  (evil-define-key 'normal vterm-mode-map (kbd "C-d")      #'vterm--self-insert)
-  (evil-define-key 'normal vterm-mode-map (kbd ",c")       #'multi-vterm)
-  (evil-define-key 'normal vterm-mode-map (kbd ",n")       #'multi-vterm-next)
-  (evil-define-key 'normal vterm-mode-map (kbd ",p")       #'multi-vterm-prev)
-  (evil-define-key 'normal vterm-mode-map (kbd "i")        #'evil-insert-resume)
-  (evil-define-key 'normal vterm-mode-map (kbd "o")        #'evil-insert-resume)
-  (evil-define-key 'normal vterm-mode-map (kbd "<return>") #'evil-insert-resume))
+  ;; Once vterm is dead, the vterm buffer is useless. Why keep it around? We can
+  ;; spawn another if want one.
+  (setq vterm-kill-buffer-on-exit t)
+
+  ;; 5000 lines of scrollback, instead of 1000
+  (setq vterm-max-scrollback 5000)
+
+  (add-hook 'vterm-mode-hook confirm-kill-processes nil)
+  (add-hook 'vterm-mode-hook hscroll-margin 0))
+
+(use-package vterm-toggle
+  :config
+  (setq vterm-toggle-fullscreen-p nil)
+  (add-to-list 'display-buffer-alist
+               '((lambda (buffer-or-name _)
+                   (let ((buffer (get-buffer buffer-or-name)))
+                     (with-current-buffer buffer
+                       (or (equal major-mode 'vterm-mode)
+                           (string-prefix-p vterm-buffer-name (buffer-name buffer))))))
+                 (display-buffer-reuse-window display-buffer-at-bottom)
+                 ;;(display-buffer-reuse-window display-buffer-in-direction)
+                 ;;display-buffer-in-direction/direction/dedicated is added in emacs27
+                 ;;(direction . bottom)
+                 (dedicated . t) ;dedicated is supported in emacs27
+                 (reusable-frames . visible)
+                 (window-height . 0.3))))
