@@ -1,7 +1,10 @@
 ; -*- lexical-binding: t; -*-
 
-;; Garbage Collections
+;; The default is 800 kilobytes.  Measured in bytes.
+(setq gc-cons-threshold (* 50 1000 1000))
 (setq gc-cons-percentage 0.6)
+
+(setq read-process-output-max (* 1024 1024))
 
 ;; Compile warnings
 ;;  (setq warning-minimum-level :emergency)
@@ -32,6 +35,12 @@
   (startup-redirect-eln-cache
    (convert-standard-filename
 	  (expand-file-name  "var/eln-cache/" user-emacs-directory))))
+
+;; ENCODING -------------
+(set-language-environment "UTF-8")
+
+;; set-language-environment sets default-input-method, which is unwanted
+(setq default-input-method nil)
 
 ;; Escape exit everything
 (global-set-key (kbd "<escape>") 'keyboard-escape-quit)

@@ -1,55 +1,22 @@
 ;; -*- lexical-binding: t; -*-
 
-(require 'package)
+(defvar bootstrap-version)
+(let ((bootstrap-file
+       (expand-file-name "straight/repos/straight.el/bootstrap.el" user-emacs-directory))
+      (bootstrap-version 5))
+  (unless (file-exists-p bootstrap-file)
+    (with-current-buffer
+        (url-retrieve-synchronously
+         "https://raw.githubusercontent.com/raxod502/straight.el/develop/install.el"
+         'silent 'inhibit-cookies)
+      (goto-char (point-max))
+      (eval-print-last-sexp)))
+  (load bootstrap-file nil 'nomessage))
 
-(setq package-user-dir (expand-file-name "elpa" user-emacs-directory))
+(straight-use-package 'use-package)
 
-(add-to-list 'package-archives '("melpa" . "https://melpa.org/packages/")) ;; ELPA and NonGNU ELPA are default in Emacs28
-
-;; avoid problems with files newer than their byte-compiled counterparts
-;; it\u2019s better a lower startup than load an outdated and maybe bugged package
-(setq load-prefer-newer t)
-
-;;(setq gnutls-algorithm-priority "NORMAL:-VERS-TLS1.3") ;; w/o this Emacs freezes when refreshing ELPA
-
-(package-initialize)
-
-(unless (package-installed-p 'quelpa)
-  (with-temp-buffer
-    (url-insert-file-contents "https://raw.githubusercontent.com/quelpa/quelpa/master/quelpa.el")
-    (eval-buffer)))
-
-(setq quelpa-update-melpa-p nil)
-
-(eval-when-compile
-  (require 'quelpa))
-
-(setq quelpa-upgrade-interval 7)
-(add-hook #'after-init-hook #'quelpa-upgrade-all-maybe)
-
-(quelpa
- '(quelpa-use-package
-   :fetcher git
-   :url "https://github.com/quelpa/quelpa-use-package.git"))
-
-(setq quelpa-update-melpa-p nil)
-
-(eval-when-compile
-  (require 'quelpa-use-package))
-
-(setq use-package-always-ensure t)
+(setq straight-use-package-by-default t)
 (setq use-package-verbose nil)
-(setq package-native-compile t)
-
-(use-package auto-package-update
-  :defer 1
-  :config
-  ;; Delete residual old versions
-  (setq auto-package-update-delete-old-versions t)
-  ;; Do not bother me when updates have taken place.
-  (setq auto-package-update-hide-results t)
-  ;; Update installed packages at startup if there is an update pending.
-  (auto-package-update-maybe))
 
 ;; Thanks but no thanks
 (setq inhibit-startup-screen t)
@@ -88,13 +55,14 @@
 
 (defcustom elk-doom-modeline-text-height nil "My preferred modeline text height.")
 (defcustom elk-text-height nil "My preferred default text height.")
+(defcustom elk-larger-text nil "Larger text height.")
 (defcustom elk-default-line-spacing 0 "Baseline line spacing.")
-(defcustom elk-fixed-pitch-font "JetBrains Mono Nerd Font" "My preferred fixed monospace font face")
-(defcustom elk-variable-pitch-font "sans" "My preferred variable font face")
 
 (if (eq elk/computer 'gpd)
-    (setq elk-text-height 120)
-  (setq elk-text-height 140))
+    (setq elk-text-height 120
+          elk-larger-text 140)
+  (setq elk-text-height 140
+        elk-larger-text 160))
 
 (if (eq elk/computer 'gpd)
     (setq elk-doom-modeline-text-height 120)
@@ -102,7 +70,7 @@
 
 (setq elk/init.org (expand-file-name "init.org" user-emacs-directory))
 (setq org-directory (file-truename "~/org"))
-(setq org-roam-directory (file-truename "~/roam"))
+(setq org-roam-directory org-directory)
 
 (defun elk/split-window-vertically-and-switch ()
   (interactive)
@@ -180,7 +148,7 @@ If run with universal argument C-u, insert org options to make export very plain
 		(insert-buffer-substring old-buffer beg end) ;; Insert desired text to export into temp buffer
 		(org-html-export-as-html) ;; Export to HTML
 		(write-file (concat (make-temp-file "jibemacsorg") ".html")) ;; Write HTML to temp file
-		(jib/open-buffer-file-mac) ;; Use my custom function to open the file (Mac only)
+		(elk/open-buffer-file-mac) ;; Use my custom function to open the file (Mac only)
 		(kill-this-buffer)))))
 
 (defun elk/org-schedule-tomorrow ()
@@ -566,14 +534,6 @@ If the universal prefix argument is used then will the windows too."
     ("kill" (evil-quit))
     (- (error command))))
 
-(setq register-preview-delay 0) ;; Show registers ASAP
-
-;;(set-register ?i (cons 'file (concat org-directory "/cpb.org")))
-;;(set-register ?h (cons 'file (concat org-directory "/work.org")))
-;;(set-register ?C (cons 'file (concat jib/emacs-stuff "/jake-emacs/init.org")))
-;;(set-register ?A (cons 'file (concat org-directory "/org-archive/homework-archive.org_archive")))
-;;(set-register ?T (cons 'file (concat org-directory "/org-archive/todo-archive.org_archive")))
-
 ;; Change the user-emacs-directory to keep unwanted things out of ~/.emacs.d
 (setq user-emacs-directory (expand-file-name "~/.cache/emacs/")
       url-history-file (expand-file-name "url/history" user-emacs-directory))
@@ -636,7 +596,6 @@ If the universal prefix argument is used then will the windows too."
 
 (use-package paren
   ;; highlight matching delimiters
-  :ensure nil
   :config
   (setq show-paren-delay 0.1
         show-paren-highlight-openparen t
@@ -704,7 +663,6 @@ If the universal prefix argument is used then will the windows too."
       backup-directory-alist (list (cons "." (concat user-emacs-directory "backup/"))))
 
 (use-package recentf
-  :ensure nil
   :config
   (setq ;;recentf-auto-cleanup 'never
    ;; recentf-max-menu-items 0
@@ -716,12 +674,6 @@ If the universal prefix argument is used then will the windows too."
 
 (require 'uniquify)
 (setq uniquify-buffer-name-style 'forward)
-
-;; ENCODING -------------
-(when (fboundp 'set-charset-priority)
-  (set-charset-priority 'unicode))       ; pretty
-(prefer-coding-system 'utf-8)            ; pretty
-(setq locale-coding-system 'utf-8)       ; please
 
 (setq blink-cursor-interval 0.6)
 (blink-cursor-mode 0)
@@ -747,16 +699,20 @@ If the universal prefix argument is used then will the windows too."
   (which-key-sort-uppercase-first nil)
   (which-key-add-column-padding 1)
   (which-key-max-display-columns nil)
-  (which-key-min-display-lines 6)
+  (which-key-min-display-lines 4)
   (which-key-side-window-slot -10)
   :config
   (put 'which-key-replacement-alist 'initial-value which-key-replacement-alist)
   ;; general improvements to which-key readability
   (which-key-setup-side-window-bottom)
-  (which-key-mode))
+  (which-key-mode)
+  (set-face-attribute 'which-key-local-map-description-face nil
+                      :weight 'bold))
 
 (use-package evil
   :init
+  ;; Make horizontal movement cross lines
+  (setq-default evil-cross-lines t)
   (setq evil-want-fine-undo t
         evil-want-keybinding nil
         evil-want-Y-yank-to-eol t
@@ -794,6 +750,7 @@ If the universal prefix argument is used then will the windows too."
   (define-key evil-motion-state-map (kbd "SPC") nil)
   (define-key evil-motion-state-map (kbd "RET") nil)
   (define-key evil-motion-state-map (kbd "TAB") nil)
+
   ;; ----- Keybindings
   ;; I tried using evil-define-key for these. Didn't work.
   ;; (define-key evil-motion-state-map "/" 'swiper)
@@ -828,8 +785,19 @@ If the universal prefix argument is used then will the windows too."
   (evil-collection-init)
   ;; A few of my own overrides/customizations
   (evil-collection-define-key 'normal 'dired-mode-map
-    (kbd "RET") 'dired-find-alternate-file)
-  )
+    (kbd "RET") 'dired-find-alternate-file))
+
+(use-package evil-lion
+  :config
+  (setq evil-lion-left-align-key (kbd "g a"))
+  (setq evil-lion-right-align-key (kbd "g A"))
+  (evil-lion-mode))
+
+(use-package evil-nerd-commenter
+  :commands (evilnc-comment-operator
+             evilnc-inner-comment
+             evilnc-outer-commenter)
+  :bind ([remap comment-line] . evilnc-comment-or-uncomment-lines))
 
 (use-package evil-numbers
   :after evil
@@ -852,9 +820,10 @@ If the universal prefix argument is used then will the windows too."
 (use-package evil-surround
   :after evil
   :config
-  (general-define-key
-   :states 'visual
-   "s" 'evil-surround-region)
+  (with-eval-after-load 'general
+    (general-define-key
+     :states 'visual
+     "s" 'evil-surround-region))
   (global-evil-surround-mode 1))
 
 ;; Allows you to use the selection for * and #
@@ -869,17 +838,20 @@ If the universal prefix argument is used then will the windows too."
 
 (use-package general
   :config
-  (general-create-definer elk/leader-key-def
+  (general-create-definer elk-leader-def
     :states '(normal insert visual motion emacs)
     :prefix "SPC"
-    :non-normal-prefix "M-SPC")
+    :global-prefix "M-SPC")
+  
+  (general-create-definer elk-localleader-def
+    :states '(normal insert visual motion emacs)
+    :prefix ",")
 
   (general-evil-setup t)
   (add-hook 'after-init-hook #'general-auto-unbind-keys))
 
-(elk/leader-key-def
+(elk-leader-def
   ;; Top level functions
-  "" nil ;; This one is required to avoid the bug (error "Key sequence SPC / starts with non-prefix key SPC")
   "/" '(elk/rg :which-key "ripgrep")
   ";" '(spacemacs/deft :which-key "deft")
   ":" '(project-find-file :which-key "p-find file")
@@ -890,176 +862,193 @@ If the universal prefix argument is used then will the windows too."
   "q" '(save-buffers-kill-terminal :which-key "quit emacs")
   "r" '(jump-to-register :which-key "registers"))
 
-(elk/leader-key-def
+(elk-leader-def
+  :infix "a"
   ;; "Applications"
-  "a" '(nil :which-key "applications")
-  "ao" '(org-agenda :which-key "org-agenda")
-  ;"am" '(mu4e :which-key "mu4e")
-  "aC" '(calc :which-key "calc")
-  "ac" '(org-capture :which-key "org-capture")
-  ;"aqq" '(org-ql-view :which-key "org-ql-view")
-  ;"aqs" '(org-ql-search :which-key "org-ql-search")
+  "" '(:which-key "applications")
+  "o" '(org-agenda :which-key "org-agenda")
+  ;; "m" '(mu4e :which-key "mu4e")
+  "C" '(calc :which-key "calc")
+  "c" '(org-capture :which-key "org-capture")
+  ;; "qq" '(org-ql-view :which-key "org-ql-view")
+  ;; "qs" '(org-ql-search :which-key "org-ql-search")
+  "t" '(vterm-toggle :which-key "toggle vterm popup")
 
-  "ab" '(nil :which-key "browse url")
-  "abf" '(browse-url-firefox :which-key "firefox")
-  "abc" '(browse-url-chrome :which-key "chrome")
-  ;"abx" '(xwidget-webkit-browse-url :which-key "xwidget")
+  "b" '(:which-key "browse url")
+  "bf" '(browse-url-firefox :which-key "firefox")
+  "bc" '(browse-url-chrome :which-key "chrome")
+  ;; "bx" '(xwidget-webkit-browse-url :which-key "xwidget")
 
-  "ad" '(dired :which-key "dired-jump"))
+  "d" '(dired :which-key "dired-jump")
+  "D" '(dired-recent-open :wk "dired history"))
 
-(elk/leader-key-def
-  ;; Buffers
-  "b" '(nil :which-key "buffer")
-  "bb" '(consult-buffer :which-key "switch buffers")
-  "bd" '(evil-delete-buffer :which-key "delete buffer")
-  "bs" '(elk/switch-to-scratch-buffer :which-key "scratch buffer")
-  "bm" '(elk/kill-other-buffers :which-key "kill other buffers")
-  "bi" '(clone-indirect-buffer  :which-key "indirect buffer")
-  "br" '(revert-buffer :which-key "revert buffer"))
+(elk-leader-def
+ :infix "b"
+ ;; Buffers
+ "" '(:which-key "buffer")
+ "b" '(consult-buffer :which-key "switch buffers")
+ "d" '(evil-delete-buffer :which-key "delete buffer")
+ "s" '(elk/switch-to-scratch-buffer :which-key "scratch buffer")
+ "m" '(elk/kill-other-buffers :which-key "kill other buffers")
+ "i" '(clone-indirect-buffer  :which-key "indirect buffer")
+ "r" '(revert-buffer :which-key "revert buffer"))
 
-(elk/leader-key-def
-  :keymaps 'prog-mode-map
-  ;; Code
-  "c" '(nil :which-key "code")
-  "cb" 'xref-pop-marker-stack
-  "cc" 'compile
-  "cC" 'recompile
-  "cd" 'xref-find-definitions
-  "cf" 'format-all-buffer
-  "cj" 'consult-eglot-symbols
-  "cr" 'eglot-rename
-  "cw" 'delete-trailing-whitespace
-  )
+(elk-leader-def
+ :infix "c"
+ :keymaps 'prog-mode-map
+ ;; Code
+ "" '(:which-key "code")
+ "b" 'xref-pop-marker-stack
+ "c" 'compile
+ "C" 'recompile
+ "d" 'xref-find-definitions
+ "f" 'format-all-buffer
+ "j" 'consult-eglot-symbols
+ "r" 'eglot-rename
+ "w" 'delete-trailing-whitespace
+ )
 
-(elk/leader-key-def
+(elk-leader-def
+ :infix "e"
   ;; Elyk
-  "e" '(nil :which-key "elyk")
-
-  "ei" '(elk/edit-init :which-key "edit dotfile")
-
-  "eh" '(nil :which-key "hydras")
-  "ehf" '(elk-hydra-variable-fonts/body :which-key "mixed-pitch face")
-  "ehw" '(elk-hydra-window/body :which-key "window control")
+  "" '(:which-key "elyk")
+  "h" '(nil :which-key "hydras")
+  "hf" '(elk-hydra-variable-fonts/body :which-key "mixed-pitch face")
+  "hw" '(elk-hydra-window/body :which-key "window control")
 
   ;; Files
-  "ef" '(nil :which-key "open files")
-  "efa" '((lambda () (interactive) (find-file "~/org/agenda.org")) :which-key "agenda.org")
-  "efe" '((lambda () (interactive) (find-file "~/org/elfeed.org")) :which-key "elfeed.org")
-  "eff" '((lambda () (interactive) (find-file "~/.config/fontconfig/fonts.conf")) :which-key "fonts.conf")
-  "efi" '((lambda () (interactive) (find-file "~/.config/i3/i3.org")) :which-key "i3.org")
-  "efp" '((lambda () (interactive) (find-file "~/.config/polybar/polybar.org")) :which-key "polybar.org")
-  "efs" '((lambda () (interactive) (find-file "~/.config/sxhkd/sxhkdrc.org")) :which-key "sxhkdrc.org")
-  "efx" '((lambda () (interactive) (find-file "~/.config/x11/x.org")) :which-key "x.org")
+  "f" '(nil :which-key "open files")
+  "fa" '((lambda () (interactive) (find-file "~/org/agenda.org")) :which-key "agenda.org")
+  "fe" '((lambda () (interactive) (find-file "~/org/elfeed.org")) :which-key "elfeed.org")
+  "ff" '((lambda () (interactive) (find-file "~/.config/fontconfig/fonts.conf")) :which-key "fonts.conf")
+  "fi" '((lambda () (interactive) (find-file "~/.config/i3/i3.org")) :which-key "i3.org")
+  "fp" '((lambda () (interactive) (find-file "~/.config/polybar/polybar.org")) :which-key "polybar.org")
+  "fs" '((lambda () (interactive) (find-file "~/.config/sxhkd/sxhkdrc.org")) :which-key "sxhkdrc.org")
+  "fx" '((lambda () (interactive) (find-file "~/.config/x11/x.org")) :which-key "x.org")
 )
 
-(elk/leader-key-def
-;; Files
-"f" '(nil :which-key "files")
-"fb" '(consult-bookmark :which-key "bookmarks")
-"ff" '(find-file :which-key "find file")
-"fn" '(spacemacs/new-empty-buffer :which-key "new file")
-"fr" '(recentf-open-files :which-key "recent files")
-"fR" '(rename-file :which-key "rename file")
-"fs" '(save-buffer :which-key "save buffer")
-"fS" '(evil-write-all :which-key "save all buffers")
-"fu" '(sudo-edit :which-key "sudo this file")
-"fU" '(sudo-edit-find-file :which-key "sudo find file"))
+(elk-leader-def
+  :infix "f"
+  ;; Files
+  "" '(:which-key "files")
+  "b" '(consult-bookmark :which-key "bookmarks")
+  "f" '(find-file :which-key "find file")
+  "n" '(spacemacs/new-empty-buffer :which-key "new file")
+  "r" '(recentf-open-files :which-key "recent files")
+  "R" '(rename-file :which-key "rename file")
+  "s" '(save-buffer :which-key "save buffer")
+  "S" '(evil-write-all :which-key "save all buffers")
+  "u" '(sudo-edit :which-key "sudo this file")
+  "U" '(sudo-edit-find-file :which-key "sudo find file"))
 ;;"fo" '(reveal-in-osx-finder :which-key "reveal in finder")
 ;;"fO" '(jib/open-buffer-file-mac :which-key "open buffer file")
 
 (use-package helpful
+  :general
+  ([remap describe-function] 'helpful-function
+   [remap describe-symbol] 'helpful-symbol
+   [remap describe-variable] 'helpful-variable
+   [remap describe-command] 'helpful-command
+   [remap describe-key] 'helpful-key)
   :config
   (defvar read-symbol-positions-list nil))
 
-(elk/leader-key-def
+(elk-leader-def
+ :infix "h"
   ;; Help/emacs
-  "h" '(nil :which-key "help/emacs")
+  "" '(:which-key "help/emacs")
 
-  "hd" '(helpful-at-point :which-key "des. at point")
-  "hv" '(helpful-variable :which-key "des. variable")
-  "hb" '(embark-bindings :which-key "des. bindings")
-  "hM" '(helpful-mode :which-key "des. mode")
-  "hf" '(helpful-callable :which-key "des. func")
-  "hF" '(describe-face :which-key "des. face")
-  "hk" '(helpful-key :which-key "des. key")
-  "ho" '(helpful-symbol :which-key "des. sym")
+  "d" '(helpful-at-point :which-key "des. at point")
+  "v" '(helpful-variable :which-key "des. variable")
+  "b" '(embark-bindings :which-key "des. bindings")
+  "M" '(helpful-mode :which-key "des. mode")
+  "f" '(helpful-callable :which-key "des. func")
+  "F" '(describe-face :which-key "des. face")
+  "i" '(elk/edit-init :which-key "edit dotfile")
+  "k" '(helpful-key :which-key "des. key")
+  "o" '(helpful-symbol :which-key "des. sym")
 
-  "hm" '(nil :which-key "switch mode")
-  "hme" '(emacs-lisp-mode :which-key "elisp mode")
-  "hmo" '(org-mode :which-key "org mode")
-  "hmt" '(text-mode :which-key "text mode"))
+  "m" '(nil :which-key "switch mode")
+  "me" '(emacs-lisp-mode :which-key "elisp mode")
+  "mo" '(org-mode :which-key "org mode")
+  "mt" '(text-mode :which-key "text mode"))
 
-(elk/leader-key-def
-  "n" '(nil :which-key "notes")
-  "nf" '(org-roam-node-find :which-key "find node")
-  "ni" '(org-roam-node-insert :which-key "insert node")
-  "nn" '(org-roam-capture :which-key "capture to node")
-  "np" '(elk/org-download-paste-clipboard :which-key "paste attach")
-  "nr" '(org-roam-buffer-toggle :which-key "toggle roam buffer")
-  "nw" '(org-roam-ui-mode :which-key "web graph")
+(elk-leader-def
+ :infix "n"
+  "" '(:which-key "notes")
+  "b" '(elk/org-roam-capture-inbox :which-key "dump brain")
+  "f" '(org-roam-node-find :which-key "find node")
+  "i" '(org-roam-node-insert-immediate :which-key "insert node")
+  "I" '(org-roam-node-insert:which-key "insert node cap.")
+  "n" '(org-roam-capture :which-key "capture to node")
+  "p" '(elk/org-download-paste-clipboard :which-key "paste attach")
+  "r" '(org-roam-buffer-toggle :which-key "toggle roam buffer")
+  "t" '(elk/org-roam-capture-task :which-key "task to prog.")
+  "w" '(org-roam-ui-mode :which-key "web graph")
 
-  "nd" '(nil :which-key "dailies")
-  "nd-" '(org-roam-dailies-find-directory)
-  "ndd" '(org-roam-dailies-goto-date)
-  "ndy" '(org-roam-dailies-goto-yesterday)
-  "ndm" '(org-roam-dailies-goto-tomorrow)
-  "ndn" '(org-roam-dailies-goto-today)
+  "d" '(:which-key "dailies")
+  "d-" '(org-roam-dailies-find-directory :which-key "find-dir")
+  "dd" '(org-roam-dailies-goto-date :which-key "goto-date")
+  "dy" '(org-roam-dailies-goto-yesterday :which-key "goto-yesterday")
+  "dm" '(org-roam-dailies-goto-tomorrow :which-key "goto-tomorrow")
+  "dn" '(org-roam-dailies-goto-today :which-key "goto-today")
 
-  "ndD" '(org-roam-dailies-capture-date)
-  "ndY" '(org-roam-dailies-capture-yesterday)
-  "ndM" '(org-roam-dailies-capture-tomorrow)
-  "ndt" '(org-roam-dailies-capture-today)
+  "dD" '(org-roam-dailies-capture-date :which-key "capture-date")
+  "dY" '(org-roam-dailies-capture-yesterday :which-key "capture-yesterday")
+  "dM" '(org-roam-dailies-capture-tomorrow :which-key "capture-tomorrow")
+  "dt" '(org-roam-dailies-capture-today :which-key "capture-today")
 )
 
-(elk/leader-key-def
+(elk-leader-def
+ :infix "x"
   ;; Help/emacs
-  "x" '(nil :which-key "text")
-  "xC" '(elk/copy-whole-buffer-to-clipboard :which-key "copy whole buffer to clipboard")
-  "xr" '(anzu-query-replace :which-key "find and replace")
-  "xs" '(yas-insert-snippet :which-key "insert yasnippet"))
+  "" '(:which-key "text")
+  "c" '(elk/copy-whole-buffer-to-clipboard :which-key "copy whole buffer to clipboard")
+  "r" '(anzu-query-replace :which-key "find and replace")
+  "s" '(yas-insert-snippet :which-key "insert yasnippet"))
 
-(elk/leader-key-def
+(elk-leader-def
+ :infix "t"
   ;; Toggles
-  "t" '(nil :which-key "toggles")
-  "tT" '(toggle-truncate-lines :which-key "truncate lines")
-  "tv" '(visual-line-mode :which-key "visual line mode")
-  "tn" '(display-line-numbers-mode :which-key "display line numbers")
-  "ta" '(mixed-pitch-mode :which-key "variable pitch mode")
-  "tc" '(visual-fill-column-mode :which-key "visual fill column mode")
-  "tt" '(load-theme :which-key "load theme")
-  "tw" '(writeroom-mode :which-key "writeroom-mode")
-  "tR" '(read-only-mode :which-key "read only mode")
-  "tI" '(toggle-input-method :which-key "toggle input method")
-  "tr" '(display-fill-column-indicator-mode :which-key "fill column indicator"))
+  "" '(:which-key "toggles")
+  "/" '(comment-line :which-key "comment")
+  "T" '(toggle-truncate-lines :which-key "truncate lines")
+  "v" '(visual-line-mode :which-key "visual line mode")
+  "n" '(display-line-numbers-mode :which-key "display line numbers")
+  "a" '(mixed-pitch-mode :which-key "variable pitch mode")
+  "c" '(visual-fill-column-mode :which-key "visual fill column mode")
+  "t" '(load-theme :which-key "load theme")
+  "w" '(writeroom-mode :which-key "writeroom-mode")
+  "R" '(read-only-mode :which-key "read only mode")
+  "I" '(toggle-input-method :which-key "toggle input method")
+  "r" '(display-fill-column-indicator-mode :which-key "fill column indicator"))
 
-(elk/leader-key-def
+(elk-leader-def
+ :infix "w"
   ;; Windows
-  "w" '(nil :which-key "window")
-  "wm" '(elk/toggle-maximize-buffer :which-key "maximize buffer")
-  "wn" '(make-frame :which-key "make frame")
-  "wd" '(evil-window-delete :which-key "delete window")
-  "ws" '(elk/split-window-vertically-and-switch :which-key "split below")
-  "wv" '(elk/split-window-horizontally-and-switch :which-key "split right")
-  ;;"wr" '(elk-hydra-window/body :which-key "hydra window")
-  "wl" '(evil-window-right :which-key "evil-window-right")
-  "wh" '(evil-window-left :which-key "evil-window-left")
-  "wj" '(evil-window-down :which-key "evil-window-down")
-  "wk" '(evil-window-up :which-key "evil-window-up")
-  "wz" '(text-scale-adjust :which-key "text zoom"))
+  "" '(:which-key "window")
+  "m" '(elk/toggle-maximize-buffer :which-key "maximize buffer")
+  "n" '(make-frame :which-key "make frame")
+  "d" '(evil-window-delete :which-key "delete window")
+  "s" '(elk/split-window-vertically-and-switch :which-key "split below")
+  "v" '(elk/split-window-horizontally-and-switch :which-key "split right")
+  "r" '(elk-hydra-window/body :which-key "hydra window")
+  "l" '(evil-window-right :which-key "evil-window-right")
+  "h" '(evil-window-left :which-key "evil-window-left")
+  "j" '(evil-window-down :which-key "evil-window-down")
+  "k" '(evil-window-up :which-key "evil-window-up")
+  "z" '(text-scale-adjust :which-key "text zoom"))
 
-(general-def
-  :prefix ","
-  :states 'motion
+(elk-localleader-def
   :keymaps '(emacs-lisp-mode-map lisp-interaction-mode-map)
-  "" nil
+  "g" '(consult-imenu :which-key "imenu")
+  "c" '(check-parens :which-key "check parens")
+  "i" '(indent-region :which-key "indent-region")
+  
   "e" '(nil :which-key "eval")
   "es" '(eval-last-sexp :which-key "eval-sexp")
   "er" '(eval-region :which-key "eval-region")
   "eb" '(eval-buffer :which-key "eval-buffer")
-
-  "g" '(consult-imenu :which-key "imenu")
-  "c" '(check-parens :which-key "check parens")
-  "I" '(indent-region :which-key "indent-region")
   )
 
 (general-def
@@ -1080,9 +1069,7 @@ If the universal prefix argument is used then will the windows too."
   )
 
 ;; Org-src - when editing an org source block
-(general-def
-  :prefix ","
-  :states 'motion
+(elk-localleader-def
   :keymaps 'org-src-mode-map
   "b" '(nil :which-key "org src")
   "bc" 'org-edit-src-abort
@@ -1092,15 +1079,12 @@ If the universal prefix argument is used then will the windows too."
 (with-eval-after-load 'org
   (define-key org-src-mode-map (kbd "C-c C-c") #'org-edit-src-exit))
 
-(general-def
-  :prefix ","
-  :states 'motion
-  :keymaps '(org-mode-map) ;; Available in org mode, org agenda
-  "" nil
+(elk-localleader-def
+  :keymaps 'org-mode-map ;; Available in org mode, org agenda
   "." '(consult-org-heading :which-key "consult-org-heading")
   "A" '(org-archive-subtree-default :which-key "org-archive")
   "a" '(org-agenda :which-key "org agenda")
-  "c" '(org-capture :which-key "org-capture")
+  "C" '(org-capture :which-key "org-capture")
   "s" '(org-schedule :which-key "schedule")
   "S" '(elk/org-schedule-tomorrow :which-key "schedule")
   "d" '(org-deadline :which-key "deadline")
@@ -1115,13 +1099,13 @@ If the universal prefix argument is used then will the windows too."
   "H" '(org-html-convert-region-to-html :which-key "convert region to html")
 
   ;; org-babel
-  "b" '(nil :which-key "babel")
+  "b" '(:which-key "babel")
   "bt" '(org-babel-tangle :which-key "org-babel-tangle")
   "bb" '(org-edit-special :which-key "org-edit-special")
   "bc" '(org-edit-src-abort :which-key "org-edit-src-abort")
   "bk" '(org-babel-remove-result-one-or-many :which-key "org-babel-remove-result-one-or-many")
 
-  "x" '(nil :which-key "text")
+  "x" '(:which-key "text")
   "xb" (spacemacs|org-emphasize elk/org-bold ?*)
   "xc" (spacemacs|org-emphasize elk/org-code ?~)
   "xi" (spacemacs|org-emphasize elk/org-italic ?/)
@@ -1130,37 +1114,20 @@ If the universal prefix argument is used then will the windows too."
   "xv" (spacemacs|org-emphasize elk/org-verbose ?~) ;; I realized that ~~ is the same and better than == (Github won't do ==)
 
   ;; insert
-  "i" '(nil :which-key "insert")
+  "i" '(:which-key "insert")
 
-  "it" '(nil :which-key "tables")
+  "it" '(:which-key "tables")
   "itt" '(org-table-create :which-key "create table")
   "itl" '(org-table-insert-hline :which-key "table hline")
 
   "il" '(org-insert-link :which-key "link")
 
   ;; clocking
-  "c" '(nil :which-key "clocking")
+  "c" '(:which-key "clocking")
   "ci" '(org-clock-in :which-key "clock in")
   "co" '(org-clock-out :which-key "clock out")
   "cj" '(org-clock-goto :which-key "jump to clock")
   )
-
-;; (general-define-key
-;;  :prefix ","
-;;  :states 'motion
-;;  :keymaps '(org-agenda-mode-map) ;; Available in org mode, org agenda
-;;  "" nil
-;;  "a" '(org-agenda :which-key "org agenda")
-;;  "c" '(org-capture :which-key "org-capture")
-;;  "s" '(org-agenda-schedule :which-key "schedule")
-;;  "d" '(org-agenda-deadline :which-key "deadline")
-;;  "t" '(org-agenda-set-tags :which-key "set tags")
-;;  ;; clocking
-;;  "c" '(nil :which-key "clocking")
-;;  "ci" '(org-agenda-clock-in :which-key "clock in")
-;;  "co" '(org-agenda-clock-out :which-key "clock out")
-;;  "cj" '(org-clock-goto :which-key "jump to clock")
-;;  )
 
 (general-define-key
  :keymaps 'org-agenda-mode-map
@@ -1209,37 +1176,30 @@ If the universal prefix argument is used then will the windows too."
   "∫" 'consult-buffer ;; option-b
   "s-o" 'elk-hydra-window/body
   
-  ;; Remapping normal help features to use Counsel version
-  "C-h v" 'describe-variable
-  "C-h o" 'describe-symbol
-  "C-h f" 'describe-function
-  "C-h F" 'describe-face
-  
   ;; Editing ------
   "M-v" 'simpleclip-paste
   "M-V" 'evil-paste-after ;; shift-paste uses the internal clipboard
   "M-c" 'simpleclip-copy
   "M-u" 'capitalize-dwim ;; Default is upcase-dwim
   "M-U" 'upcase-dwim ;; M-S-u (switch upcase and capitalize)
-  "C-c u" 'jib/split-and-close-sentence
+  "C-c u" 'elk/split-and-close-sentence
+  
+  ;; Zooming ------
+  "C--" '(lambda () (interactive) (text-scale-decrease 1)) ;; Decrease font size
+  "C-=" '(lambda () (interactive) (text-scale-increase 1)) ;; Increase font size
   
   ;; Utility ------
   "C-c c" 'org-capture
-  "C-c a" 'org-agenda
-  ;; "C-s" 'counsel-grep-or-swiper ;; Large files will use grep (faster)
-  ;;"s-\"" 'ispell-word ;; that's super-shift-'
-  "M-+" 'elk/calc-speaking-time
-)
+  "C-c a" 'org-agenda)
 
 ;; Non-insert mode keymaps
 (general-def
   :states '(normal visual motion)
-  "C--" '(lambda () (interactive) (text-scale-decrease 1)) ;; Decrease font size
-  "C-=" '(lambda () (interactive) (text-scale-increase 1)) ;; Increase font size
   "gc" 'comment-line
-  "gC" 'comment-dwim
-  "j" 'evil-next-visual-line ;; I prefer visual line navigation
-  "k" 'evil-previous-visual-line ;; ""
+  "H" 'evil-first-non-blank
+  "L" 'evil-org-end-of-line
+  "k" 'evil-previous-visual-line ;; I prefer visual line navigation
+  "j" 'evil-next-visual-line ; ""
   "|" '(lambda () (interactive) (org-agenda nil "n")) ;; Opens my n custom org-super-agenda view
   "C-|" '(lambda () (interactive) (org-agenda nil "m")) ;; Opens my m custom org-super-agenda view
   )
@@ -1285,23 +1245,23 @@ If the universal prefix argument is used then will the windows too."
    "
 Movement      ^Split^            ^Switch^        ^Resize^
 ----------------------------------------------------------------
-_M-<left>_  <   _/_ vertical      _b_uffer        _<left>_  <
-_M-<right>_ >   _-_ horizontal    _f_ind file     _<down>_  ↓
-_M-<up>_    ↑   _m_aximize        _s_wap          _<up>_    ↑
-_M-<down>_  ↓   _c_lose           _[_backward     _<right>_ >
-_q_uit          _e_qualize        _]_forward     ^
-^               ^               _K_ill         ^
-^               ^                  ^             ^
+_h_  <        _s_ vertical       _b_uffer        _<left>_  <
+_l_  >        _v_ horizontal     _f_ind file     _<down>_  ↓
+_k_  ↑        _m_aximize         s_w_ap          _<up>_    ↑
+_j_  ↓        _c_lose            _[_backward     _<right>_ >
+_q_uit        _e_qualize         _]_forward      ^
+^             ^                  _K_ill          ^
+^             ^                  ^               ^
 "
    ;; Movement
-   ("M-<left>" windmove-left)
-   ("M-<down>" windmove-down)
-   ("M-<up>" windmove-up)
-   ("M-<right>" windmove-right)
+   ("h" windmove-left)
+   ("j" windmove-down)
+   ("k" windmove-up)
+   ("l" windmove-right)
 
    ;; Split/manage
-   ("-" elk/split-window-vertically-and-switch)
-   ("/" elk/split-window-horizontally-and-switch)
+   ("s" elk/split-window-vertically-and-switch)
+   ("v" elk/split-window-horizontally-and-switch)
    ("c" evil-window-delete)
    ("d" evil-window-delete)
    ("m" delete-other-windows)
@@ -1311,7 +1271,7 @@ _q_uit          _e_qualize        _]_forward     ^
    ("b" consult-buffer)
    ("f" find-file)
    ("P" project-find-file)
-   ("s" ace-swap-window)
+   ("w" ace-swap-window)
    ("[" previous-buffer)
    ("]" next-buffer)
    ("K" kill-this-buffer)
@@ -1326,58 +1286,6 @@ _q_uit          _e_qualize        _]_forward     ^
 
 ;; If a popup does happen, don't resize windows to be equal-sized
 (setq even-window-sizes nil)
-
-(use-package company
-  :diminish company-mode
-  :disabled t
-  :general
-  (general-define-key :keymaps 'company-active-map
-                      "C-j" 'company-select-next
-                      "C-k" 'company-select-previous)
-  (general-define-key
-   :states 'insert
-   "C-SPC" 'company-complete-common)
-  :init
-  ;; These configurations come from Doom Emacs:
-  (add-hook 'after-init-hook 'global-company-mode)
-  (setq company-minimum-prefix-length 2
-        company-tooltip-limit 14
-        company-tooltip-align-annotations t
-        company-require-match 'never
-        company-global-modes '(not erc-mode message-mode help-mode gud-mode)
-        company-frontends
-        '(company-pseudo-tooltip-frontend  ; always show candidates in overlay tooltip
-          company-echo-metadata-frontend)  ; show selected candidate docs in echo area
-        company-backends '(company-capf company-files company-keywords)
-        company-auto-complete nil
-        company-auto-complete-chars nil
-        company-dabbrev-other-buffers nil
-        company-dabbrev-ignore-case nil
-        company-dabbrev-downcase nil)
-
-  :config
-  (setq company-idle-delay nil
-        company-tooltip-limit 10)
-
-  (add-hook 'company-mode-hook #'evil-normalize-keymaps)
-  :custom-face
-  (company-tooltip ((t (:family "Roboto Mono")))))
-
-
-;; (use-package company-box
-;;   :hook (company-mode . company-box-mode)
-;;   :init
-;;   (setq company-box-icons-alist 'company-box-icons-all-the-icons)
-;;   (setq company-box-icons-elisp
-;;    '((fa_tag :face font-lock-function-name-face) ;; Function
-;;      (fa_cog :face font-lock-variable-name-face) ;; Variable
-;;      (fa_cube :face font-lock-constant-face) ;; Feature
-;;      (md_color_lens :face font-lock-doc-face))) ;; Face
-;;   :config
-;;   (require 'all-the-icons)
-;;   (setf (alist-get 'min-height company-box-frame-parameters) 6)
-;;   (setq company-box-icons-alist 'company-box-icons-all-the-icons)
-;;   )
 
 (use-package corfu
   :general
@@ -1490,7 +1398,7 @@ _q_uit          _e_qualize        _]_forward     ^
   ;;(add-to-list 'completion-at-point-functions #'cape-dabbrev)
   ;;(add-to-list 'completion-at-point-functions #'cape-history)
   (add-to-list 'completion-at-point-functions #'cape-keyword)
-  ;;(add-to-list 'completion-at-point-functions #'cape-tex)
+  (add-to-list 'completion-at-point-functions #'cape-tex)
   ;;(add-to-list 'completion-at-point-functions #'cape-sgml)
   ;;(add-to-list 'completion-at-point-functions #'cape-rfc1345)
   ;;(add-to-list 'completion-at-point-functions #'cape-abbrev)
@@ -1512,7 +1420,6 @@ folder, otherwise delete a word"
     (backward-kill-word arg)))
 
 (use-package vertico
-  :quelpa (vertico :fetcher github :repo "minad/vertico")
   ;; Special recipe to load extensions conveniently
   :general
   (:keymaps 'vertico-map
@@ -1543,10 +1450,15 @@ folder, otherwise delete a word"
   ;; cleans ~/foo/bar/// to /, and ~/foo/bar/~/ to ~/.
   (add-hook 'rfn-eshadow-update-overlay-hook #'vertico-directory-tidy)
   ;;(add-hook 'minibuffer-setup-hook #'vertico-repeat-save)
+
+  ;; These commands are problematic and automatically show the *Completions* buffer
+  (advice-add #'tmm-add-prompt :after #'minibuffer-hide-completions)
+
   )
 
 ;; A few more useful configurations...
 (use-package emacs
+  :straight (:type built-in)
   :init
   ;; TAB cycle if there are only few candidates
   (setq completion-cycle-threshold 3)
@@ -1555,6 +1467,9 @@ folder, otherwise delete a word"
   ;; Corfu commands are hidden, since they are not supposed to be used via M-x.
   ;; (setq read-extended-command-predicate
   ;;       #'command-completion-default-include-p)
+
+  ;; Make TAB like all other editors
+  (setq tab-always-indent 'nil)
 
   ;; Add prompt indicator to `completing-read-multiple'.
   ;; We display [CRM<separator>], e.g., [CRM,] if the separator is a comma.
@@ -1579,12 +1494,12 @@ folder, otherwise delete a word"
 
   ;; Enable recursive minibuffers
   (setq enable-recursive-minibuffers t)
+ 
   :custom
   (help-window-select t "Switch to help buffers automatically"))
 
 ;; Example configuration for Consult
 (use-package consult
-  :quelpa (consult :fetcher github :repo "minad/consult")
   :defer t
   ;; Enable automatic preview at point in the *Completions* buffer. This is
   ;; relevant when you use the default completion UI.
@@ -1606,10 +1521,10 @@ folder, otherwise delete a word"
     [remap switch-to-buffer-other-window] #'consult-buffer-other-window
     [remap switch-to-buffer-other-frame]  #'consult-buffer-other-frame
     [remap yank-pop]                      #'consult-yank-pop)
-    ;;[remap persp-switch-to-buffer]        #'+vertico/switch-workspace-buffer
-  
+  ;;[remap persp-switch-to-buffer]        #'+vertico/switch-workspace-buffer
+
   (advice-add #'multi-occur :override #'consult-multi-occur)
-  
+
   (setq xref-show-xrefs-function       #'consult-xref
         xref-show-definitions-function #'consult-xref)
 
@@ -1651,7 +1566,32 @@ folder, otherwise delete a word"
                      consult-bookmark consult-recent-file consult-xref
                      consult--source-bookmark consult--source-recent-file
                      consult--source-project-recent-file
-                     :preview-key (kbd "C-SPC")))
+                     :preview-key (kbd "C-SPC"))
+
+  (defvar +vertico--consult-org-source
+    (list :name     "Org Buffer"
+          :category 'buffer
+          :narrow   ?o
+          :hidden   t
+          :face     'consult-buffer
+          :history  'buffer-name-history
+          :state    #'consult--buffer-state
+          :new
+          (lambda (name)
+            (with-current-buffer (get-buffer-create name)
+              (insert "#+title: " name "\n\n")
+              (org-mode)
+              (consult--buffer-action (current-buffer))))
+          :items
+          (lambda ()
+            (mapcar #'buffer-name
+                    (if (featurep 'org)
+                        (org-buffer-list)
+                      (seq-filter
+                       (lambda (x)
+                         (eq (buffer-local-value 'major-mode x) 'org-mode))
+                       (buffer-list)))))))
+  (add-to-list 'consult-buffer-sources '+vertico--consult-org-source 'append))
 
 (use-package consult-dir
   :bind (([remap list-directory] . consult-dir)
@@ -1756,7 +1696,6 @@ folder, otherwise delete a word"
   (sp-local-pair '(emacs-lisp-mode org-mode markdown-mode gfm-mode)
                  "[" nil :post-handlers '(:rem ("| " "SPC")))
 
-
   (dolist (brace '("(" "{" "["))
     (sp-pair brace nil
              :post-handlers '(("||\n[i]" "RET") ("| " "SPC"))
@@ -1818,7 +1757,7 @@ folder, otherwise delete a word"
 (global-undo-fu-session-mode)
 
 (use-package dired
-  :ensure nil
+  :straight (:type built-in)
   :defer t
   :commands (dired dired-jump)
   :bind (("C-x C-j" . dired-jump))
@@ -1844,8 +1783,14 @@ folder, otherwise delete a word"
     "H" 'dired-omit-mode
     "l" 'dired-single-buffer))
 
-(use-package dired-single
-  :after dired)
+(use-package dired-recent
+  :after dired
+  :commands dired-recent-open
+  :config
+  (dired-recent-mode)
+  (general-define-key
+   :keymaps 'dired-recent-mode-map
+   "C-x C-d" nil))
 
 (use-package all-the-icons-dired
   :hook (dired-mode . all-the-icons-dired-mode)
@@ -1867,29 +1812,31 @@ folder, otherwise delete a word"
   (evil-collection-define-key 'normal 'dired-mode-map
     "H" 'dired-hide-dotfiles-mode))
 
-(use-package dired-rainbow
-  :defer 2
+(use-package diredfl
+  :after dired
   :config
-  (dired-rainbow-define-chmod directory "#6cb2eb" "d.*")
-  (dired-rainbow-define html "#eb5286" ("css" "less" "sass" "scss" "htm" "html" "jhtm" "mht" "eml" "mustache" "xhtml"))
-  (dired-rainbow-define xml "#f2d024" ("xml" "xsd" "xsl" "xslt" "wsdl" "bib" "json" "msg" "pgn" "rss" "yaml" "yml" "rdata"))
-  (dired-rainbow-define document "#9561e2" ("docm" "doc" "docx" "odb" "odt" "pdb" "pdf" "ps" "rtf" "djvu" "epub" "odp" "ppt" "pptx"))
-  (dired-rainbow-define markdown "#ffed4a" ("org" "etx" "info" "markdown" "md" "mkd" "nfo" "pod" "rst" "tex" "textfile" "txt"))
-  (dired-rainbow-define database "#6574cd" ("xlsx" "xls" "csv" "accdb" "db" "mdb" "sqlite" "nc"))
-  (dired-rainbow-define media "#de751f" ("mp3" "mp4" "mkv" "MP3" "MP4" "avi" "mpeg" "mpg" "flv" "ogg" "mov" "mid" "midi" "wav" "aiff" "flac"))
-  (dired-rainbow-define image "#f66d9b" ("tiff" "tif" "cdr" "gif" "ico" "jpeg" "jpg" "png" "psd" "eps" "svg"))
-  (dired-rainbow-define log "#c17d11" ("log"))
-  (dired-rainbow-define shell "#f6993f" ("awk" "bash" "bat" "sed" "sh" "zsh" "vim"))
-  (dired-rainbow-define interpreted "#38c172" ("py" "ipynb" "rb" "pl" "t" "msql" "mysql" "pgsql" "sql" "r" "clj" "cljs" "scala" "js"))
-  (dired-rainbow-define compiled "#4dc0b5" ("asm" "cl" "lisp" "el" "c" "h" "c++" "h++" "hpp" "hxx" "m" "cc" "cs" "cp" "cpp" "go" "f" "for" "ftn" "f90" "f95" "f03" "f08" "s" "rs" "hi" "hs" "pyc" ".java"))
-  (dired-rainbow-define executable "#8cc4ff" ("exe" "msi"))
-  (dired-rainbow-define compressed "#51d88a" ("7z" "zip" "bz2" "tgz" "txz" "gz" "xz" "z" "Z" "jar" "war" "ear" "rar" "sar" "xpi" "apk" "xz" "tar"))
-  (dired-rainbow-define packaged "#faad63" ("deb" "rpm" "apk" "jad" "jar" "cab" "pak" "pk3" "vdf" "vpk" "bsp"))
-  (dired-rainbow-define encrypted "#ffed4a" ("gpg" "pgp" "asc" "bfe" "enc" "signature" "sig" "p12" "pem"))
-  (dired-rainbow-define fonts "#6cb2eb" ("afm" "fon" "fnt" "pfb" "pfm" "ttf" "otf"))
-  (dired-rainbow-define partition "#e3342f" ("dmg" "iso" "bin" "nrg" "qcow" "toast" "vcd" "vmdk" "bak"))
-  (dired-rainbow-define vc "#0074d9" ("git" "gitignore" "gitattributes" "gitmodules"))
-  (dired-rainbow-define-chmod executable-unix "#38c172" "-.*x.*"))
+  (diredfl-global-mode 1))
+
+(use-package dired-sidebar
+  :after dired
+  :commands (dired-sidebar-toggle-sidebar)
+  :init
+  (general-define-key
+   :keymaps '(normal override global)
+   "C-n" 'dired-sidebar-toggle-sidebar)
+  :config
+  (defun elk/dired-sidebar-setup ()
+    (toggle-truncate-lines 1)
+    (display-line-numbers-mode -1)
+    (setq-local dired-subtree-use-backgrounds nil))
+
+  (general-define-key
+   :keymaps 'dired-sidebar-mode-map
+   :states '(normal emacs)
+   "l" 'dired-sidebar-find-file
+   "h" 'dired-sidebar-up-directory
+   "=" 'dired-narrow)
+  (add-hook 'dired-sidebar-mode-hook #'elk/dired-sidebar-setup))
 
 (use-package super-save
   :diminish super-save-mode
@@ -1912,36 +1859,55 @@ folder, otherwise delete a word"
   :init (setq save-place-limit 100)
   :config (save-place-mode))
 
-(use-package yasnippet
-  :diminish yas-minor-mode
-  :defer 0
+(use-package tempel
+  ;; Require trigger prefix before template name when completing.
+  ;; :custom
+  ;; (tempel-trigger-prefix "<")
+  :bind (("M-+" . tempel-complete) ;; Alternative tempel-expand
+         ("M-*" . tempel-insert))
   :init
-  (setq yas-verbosity 0)
-  :config
-  ;;(setq yas-snippet-dirs (list (expand-file-name "snippets" elk/emacs-stuff)))
-  (yas-global-mode 1)) ;; or M-x yas-reload-all if you've started YASnippet already.
-
-
-;; Silences the warning when running a snippet with backticks (runs a command in the snippet)
-;; I use backtick commands to get the date for org snippets
-(require 'warnings)
-(add-to-list 'warning-suppress-types '(yasnippet backquote-change))
-
-(use-package yasnippet-snippets
-  :after yasnippet)
+  ;; Setup completion at point
+  (defun tempel-setup-capf ()
+    ;; Add the Tempel Capf to `completion-at-point-functions'.
+    ;; `tempel-expand' only triggers on exact matches. Alternatively use
+    ;; `tempel-complete' if you want to see all matches, but then you
+    ;; should also configure `tempel-trigger-prefix', such that Tempel
+    ;; does not trigger too often when you don't expect it. NOTE: We add
+    ;; `tempel-expand' *before* the main programming mode Capf, such
+    ;; that it will be tried first.
+    (setq-local completion-at-point-functions
+                (cons #'tempel-expand
+                      completion-at-point-functions)))
+  
+  (add-hook 'prog-mode-hook 'tempel-setup-capf)
+  (add-hook 'text-mode-hook 'tempel-setup-capf)
+  ;; Optionally make the Tempel templates available to Abbrev,
+  ;; either locally or globally. `expand-abbrev' is bound to C-x '.
+  ;; (add-hook 'prog-mode-hook #'tempel-abbrev-mode)
+  ;; (global-tempel-abbrev-mode)
+)
 
 (setq text-scale-mode-step 1.1) ;; How much to adjust text scale by when using `text-scale-mode'
 
 (setq-default line-spacing elk-default-line-spacing)
 
-(set-face-attribute 'default nil :family elk-fixed-pitch-font :weight 'medium :height elk-text-height)
+(set-face-attribute 'default nil
+                    :family "JetBrains Mono"
+                    :weight 'regular
+                    :height elk-text-height)
 
 ;; Float height value (1.0) makes fixed-pitch take height 1.0 * height of default
 ;; This means it will scale along with default when the text is zoomed
-(set-face-attribute 'fixed-pitch nil :font elk-fixed-pitch-font :weight 'regular :height 1.0)
+(set-face-attribute 'fixed-pitch nil
+                    :family "JetBrains Mono"
+                    :weight 'regular
+                    :height elk-text-height)
 
 ;; Height of 160 seems to match perfectly with 12-point on Google Docs
-(set-face-attribute 'variable-pitch nil :family elk-variable-pitch-font :height elk-text-height)
+(set-face-attribute 'variable-pitch nil
+                    :family "Fira Sans"
+                    :weight 'book
+                    :height elk-larger-text)
 
 (use-package mixed-pitch
   :defer t
@@ -1949,6 +1915,30 @@ folder, otherwise delete a word"
   (setq mixed-pitch-set-height nil)
   (dolist (face '(org-date org-priority org-tag org-special-keyword)) ;; Some extra faces I like to be fixed-pitch
     (add-to-list 'mixed-pitch-fixed-pitch-faces face)))
+
+(defun elk/replace-unicode-font-mapping (block-name old-font new-font)
+  (let* ((block-idx (cl-position-if
+                     (lambda (i) (string-equal (car i) block-name))
+                     unicode-fonts-block-font-mapping))
+         (block-fonts (cadr (nth block-idx unicode-fonts-block-font-mapping)))
+         (updated-block (cl-substitute new-font old-font block-fonts :test 'string-equal)))
+    (setf (cdr (nth block-idx unicode-fonts-block-font-mapping))
+          `(,updated-block))))
+
+(use-package unicode-fonts
+  :disabled t
+  :custom
+  (unicode-fonts-skip-font-groups '(low-quality-glyphs))
+  :config
+  ;; Fix the font mappings to use the right emoji font
+  (mapcar
+   (lambda (block-name)
+     (elk/replace-unicode-font-mapping block-name "Apple Color Emoji" "Noto Color Emoji"))
+   '("Dingbats"
+     "Emoticons"
+     "Miscellaneous Symbols and Pictographs"
+     "Transport and Map Symbols"))
+  (unicode-fonts-setup))
 
 ;; Disables showing system load in modeline, useless anyway
   (setq display-time-default-load-average nil)
@@ -1986,7 +1976,6 @@ folder, otherwise delete a word"
   (all-the-icons-completion-mode))
 
 (use-package doom-themes
-  :after mixed-pitch
   :config
   (doom-themes-visual-bell-config)
   (doom-themes-org-config)
@@ -2009,8 +1998,16 @@ folder, otherwise delete a word"
 (set-face-attribute 'fringe nil :background nil)
 (set-face-attribute 'header-line nil :background nil :inherit 'default)
 
-(add-hook 'prog-mode-hook 'hl-line-mode)
-(add-hook 'prog-mode-hook 'display-line-numbers-mode)
+;; Enable line numbers for some modes
+(dolist (mode '(text-mode-hook
+                prog-mode-hook
+                conf-mode-hook))
+  (add-hook mode (lambda () (display-line-numbers-mode 1)))
+  (add-hook mode (lambda () (hl-line-mode 1))))
+
+;; Override some modes which derive from the above
+(dolist (mode '(org-mode-hook))
+  (add-hook mode (lambda () (display-line-numbers-mode 0))))
 
 ;; This makes emacs transparent
 (set-frame-parameter (selected-frame) 'alpha '(95 . 95))
@@ -2058,12 +2055,12 @@ folder, otherwise delete a word"
 (use-package org-superstar
   :hook (org-mode . org-superstar-mode)
   :config
-  (setq org-superstar-headline-bullets-list '("\u25c9" "\u25cb" "\u25cf" "\u25cb" "\u25cf" "\u25cb" "\u25cf")
+  (setq org-superstar-headline-bullets-list '("◉" "○" "✸" "✿" "✤" "✜" "◆" "▶")
         org-superstar-leading-bullet ?\s
         org-superstar-leading-fallback ?\s
-        ;; org-superstar-item-bullet-alist '((?+ . ?➤) (?- . ?✦)) ; changes +/- symbols in item lists
+        org-superstar-item-bullet-alist '((?+ . ?➤) (?- . ?✦)) ; changes +/- symbols in item lists
         org-superstar-prettify-item-bullets t
-        org-hide-leading-stars t)
+        org-hide-leading-stars nil)
   (setq org-superstar-special-todo-items t  ;; Makes TODO header bullets into boxes
         org-superstar-todo-bullet-alist '(("TODO" . 9744)
                                           ("INPROG-TODO" . 9744)
@@ -2119,7 +2116,11 @@ folder, otherwise delete a word"
   :hook (org-mode . org-auto-tangle-mode))
 
 (use-package ox-reveal
+<<<<<<< HEAD
   :after org)
+=======
+  :defer 1)
+>>>>>>> 4e9bb3382a451abb3596164dc190541e66cf09aa
 
 (defun elk/org-download-paste-clipboard (&optional use-default-filename)
   (interactive "P")
@@ -2145,6 +2146,18 @@ folder, otherwise delete a word"
 (eval-after-load 'org
     '(org-load-modules-maybe t))
 
+(require 'org-tempo)
+(add-to-list 'org-structure-template-alist '("sh" . "src sh"))
+(add-to-list 'org-structure-template-alist '("n" . "notes"))
+(add-to-list 'org-structure-template-alist '("el" . "src emacs-lisp"))
+(add-to-list 'org-structure-template-alist '("li" . "src lisp"))
+(add-to-list 'org-structure-template-alist '("sc" . "src scheme"))
+(add-to-list 'org-structure-template-alist '("ts" . "src typescript"))
+(add-to-list 'org-structure-template-alist '("py" . "src python"))
+(add-to-list 'org-structure-template-alist '("go" . "src go"))
+(add-to-list 'org-structure-template-alist '("yaml" . "src yaml"))
+(add-to-list 'org-structure-template-alist '("json" . "src json"))
+
 ;; Org-agenda specific bindings
 (with-eval-after-load 'evil-mode
   (evil-define-key 'motion org-agenda-mode-map
@@ -2161,32 +2174,19 @@ folder, otherwise delete a word"
   )
 
 (defun elk/org-font-setup ()
-  (set-face-attribute 'org-document-title nil :height 1.1) ;; Bigger titles, smaller drawers
-  (set-face-attribute 'org-checkbox-statistics-done nil :inherit 'org-done :foreground "green3") ;; Makes org done checkboxes green
-  (set-face-attribute 'org-ellipsis nil :inherit 'shadow :height 0.8) ;; Makes org-ellipsis shadow (blends in better)
-  (set-face-attribute 'org-scheduled-today nil :weight 'normal) ;; Removes bold from org-scheduled-today
-  (set-face-attribute 'org-super-agenda-header nil :inherit 'org-agenda-structure :weight 'bold) ;; Bolds org-super-agenda headers
-  (set-face-attribute 'org-scheduled-previously nil :background "red") ;; Bolds org-super-agenda headers
+  (custom-theme-set-faces
+   'user
+   ;; '(org-level-4 ((t (:inherit t :height 1.1))))
+   ;; '(org-level-3 ((t (:inherit t :height 1.25))))
+   ;; '(org-level-2 ((t (:inherit t :height 1.5))))
+   ;; '(org-level-1 ((t (:inherit t :height 1.75))))
+   '(org-block ((t (:foreground nil))))
+   '(org-tag ((t (:inherit org-tag :italic t))))
+   '(org-ellipsis ((t (:inherit shadow :height 0.8))))
+   '(org-link ((t (:foreground "royal blue" :underline t)))))
 
-  ;; (set-face-attribute 'org-drawer nil :inherit 'fixed-pitch :inherit 'shadow :height 0.6 :foreground nil) ;; Makes org-drawer way smaller
-
-  ;; Here I set things that need it to be fixed-pitch, just in case the font I am using isn't monospace.
-  ;; (dolist (face '(org-list-dt org-tag org-todo org-table org-checkbox org-priority org-date org-verbatim org-special-keyword))
-  ;;   (set-face-attribute `,face nil :inherit 'fixed-pitch))
-
-  ;; (dolist (face '(org-code org-verbatim org-meta-line))
-  ;;   (set-face-attribute `,face nil :inherit 'shadow :inherit 'fixed-pitch))
-
-  ;; Set faces for heading levels
-  (custom-set-faces
-   '(org-level-1 ((t (:inherit outline-1 :height 1.4))))
-   '(org-level-2 ((t (:inherit outline-2 :height 1.3))))
-   '(org-level-3 ((t (:inherit outline-3 :height 1.2))))
-   '(org-level-4 ((t (:inherit outline-4 :height 1.1))))
-   '(org-level-5 ((t (:inherit outline-5 :height 1.0))))
-   )
-
-  (mixed-pitch-mode 1))
+  (mixed-pitch-mode 1)
+  )
 
 (defun elk/prettify-symbols-setup ()
   ;; checkboxes
@@ -2253,28 +2253,20 @@ Meant for `org-mode-hook'."
   (setq-local line-spacing (+ elk-default-line-spacing 1)))
 
 (use-package org
-  :pin gnu
   :hook (org-mode . +org-enable-auto-reformat-tables-h)
   :hook (org-mode . elk/org-setup)
   :hook (org-mode . elk/prettify-symbols-setup)
   :hook (org-mode . elk/org-font-setup)
-  :hook (org-mode . locally-defer-font-lock)
+  ;;:hook (org-mode . locally-defer-font-lock)
   :hook (org-capture-mode . evil-insert-state) ;; Start org-capture in Insert state by default
   :diminish org-indent-mode
   :diminish visual-line-mode
-  :custom-face
-  (org-level-1 ((t (:inherit outline-1 :height 1.4))))
-  (org-level-2 ((t (:inherit outline-2 :height 1.3))))
-  (org-level-3 ((t (:inherit outline-3 :height 1.2))))
-  (org-level-4 ((t (:inherit outline-4 :height 1.1))))
-  (org-level-5 ((t (:inherit outline-5 :height 1.0))))
-  (org-tag ((t (:inherit org-tag :italic t))))
   :config
 
 (setq org-ellipsis " ⬎ ") ;; ▼
 (setq org-src-fontify-natively t) ;; Syntax highlighting in org src blocks
 (setq org-highlight-latex-and-related '(native)) ;; Highlight inline LaTeX
-(setq org-startup-folded 'show2levels) ;; Org files start up folded by default
+(setq org-startup-folded 'showall)
 (setq org-image-actual-width nil)
 
 (setq org-cycle-separator-lines 1)
@@ -2302,10 +2294,10 @@ Meant for `org-mode-hook'."
 
 ;; Automatically save and close the org files I most frequently archive to.
 ;; I see no need to keep them open and crowding my buffer list.
-;; Uses my own function jib/save-and-close-this-buffer.
+;; Uses my own function elk/save-and-close-this-buffer.
 ;; (dolist (file '("homework-archive.org_archive" "todo-archive.org_archive"))
 ;;   (advice-add 'org-archive-subtree-default :after
-;;               (lambda () (jib/save-and-close-this-buffer file))))
+;;               (lambda () (elk/save-and-close-this-buffer file))))
 
 (setq counsel-org-tags '("qp" "ec" "st")) ;; Quick-picks, extracurricular, short-term
 
@@ -2365,6 +2357,11 @@ Meant for `org-mode-hook'."
    (emacs-lisp . t)
    ))
 
+;; Asynchronous src block execution
+(use-package ob-async
+  :config
+  (setq ob-async-no-async-languages-alist '("python" "hy" "jupyter-python" "jupyter-octave" "restclient")))
+
 (use-package gnuplot)
 
 ;; Don't prompt before running code in org
@@ -2395,7 +2392,6 @@ Meant for `org-mode-hook'."
 (setq org-agenda-skip-scheduled-if-done t)
 ;; If something is scheduled, don't tell me it is due soon
 (setq org-agenda-skip-deadline-prewarning-if-scheduled t)
-
 
 (setq org-agenda-timegrid-use-ampm 1)
 
@@ -2484,16 +2480,16 @@ Meant for `org-mode-hook'."
                                                        ))))
 
                 (alltodo "" ((org-agenda-overriding-header "All Tasks:")
-                             (org-super-agenda-groups jib-org-super-agenda-school-groups
+                             (org-super-agenda-groups elk-org-super-agenda-school-groups
                                                       ))))
                ))
 
 (add-to-list 'org-agenda-custom-commands
              '("m" "Agendaless Super zaen view"
                ((alltodo "" ((org-agenda-overriding-header "Agendaless Todo View")
-                             (org-super-agenda-groups (push '(:name "Today's Tasks" ;; jib-org-super-agenda-school-groups, with this added on
+                             (org-super-agenda-groups (push '(:name "Today's Tasks" ;; elk-org-super-agenda-school-groups, with this added on
                                                                     :scheduled today
-                                                                    :deadline today) jib-org-super-agenda-school-groups)
+                                                                    :deadline today) elk-org-super-agenda-school-groups)
                                                       )))))
              )
 ;; Org-super-agenda-mode itself is activated in the use-package block
@@ -2505,7 +2501,6 @@ Meant for `org-mode-hook'."
 (setq org-refile-targets (quote (("~/Dropbox/org/work.org" :maxlevel . 2))))
 (setq org-outline-path-complete-in-steps nil) ; Refile in a single go
 (setq org-refile-use-outline-path t)          ; Show full paths for refilin0
-
 
 (setq org-capture-templates
       '(
@@ -2568,9 +2563,9 @@ Meant for `org-mode-hook'."
   (add-to-list 'org-latex-classes
                '("org-plain-latex" ;; I use this in base class in all of my org exports.
                  "\\documentclass{extarticle}
-         [NO-DEFAULT-PACKAGES]
-         [PACKAGES]
-         [EXTRA]"
+           [NO-DEFAULT-PACKAGES]
+           [PACKAGES]
+           [EXTRA]"
                  ("\\section{%s}" . "\\section*{%s}")
                  ("\\subsection{%s}" . "\\subsection*{%s}")
                  ("\\subsubsection{%s}" . "\\subsubsection*{%s}")
@@ -2584,81 +2579,105 @@ Meant for `org-mode-hook'."
 ) ;; This parenthesis ends the org use-package.
 
 (use-package org-roam
+  :hook (org-load . org-roam-mode)
   :init
   (setq org-roam-db-gc-threshold most-positive-fixnum)
   (setq org-roam-v2-ack t)
-  :custom
-  (org-roam-node-display-template
-   (concat "${title:*} " (propertize "${tags:42}" 'face 'org-tag)))
-  (org-roam-completion-everywhere t)
-  (org-roam-list-files-commands '(fd fdfind rg find))
   :bind (("C-c n l" . org-roam-buffer-toggle)
          ("C-c n f" . org-roam-node-find)
          ("C-c n i" . org-roam-node-insert)
          :map org-mode-map
          ("C-M-i"    . completion-at-point))
   :config
+  (setq org-roam-completion-everywhere t)
+  (setq org-roam-list-files-commands '(fd fdfind rg find))
+
+(defun org-roam-node-insert-immediate (arg &rest args)
+  (interactive "P")
+  (let ((args (cons arg args))
+        (org-roam-capture-templates (list (append (car org-roam-capture-templates)
+                                                  '(:immediate-finish t)))))
+    (apply #'org-roam-node-insert args)))
+
+(defun elk/org-roam-capture-inbox ()
+  (interactive)
+  (org-roam-capture- :node (org-roam-node-create)
+                     :templates '(("i" "inbox" plain "* %?"
+                                  :if-new (file+head "braindump/inbox.org" "#+title: Inbox\n")))))
+
+(defun elk/org-roam-filter-by-tag (tag-name)
+  (lambda (node)
+    (member tag-name (org-roam-node-tags node))))
+
+(defun elk/org-roam-list-notes-by-tag (tag-name)
+  (mapcar #'org-roam-node-file
+          (seq-filter
+           (elk/org-roam-filter-by-tag tag-name)
+           (org-roam-node-list))))
+
+(defun elk/org-roam-refresh-agenda-list ()
+  (interactive)
+  (setq org-agenda-files (elk/org-roam-list-notes-by-tag "Project")))
+
+(cl-defmethod org-roam-node-type ((node org-roam-node))
+  "Return the TYPE of NODE."
+  (condition-case nil
+      (file-name-nondirectory
+       (directory-file-name
+        (file-name-directory
+         (file-relative-name (org-roam-node-file node) org-roam-directory))))
+    (error "")))
+
+(setq org-roam-node-display-template
+      (concat (propertize "${type:10}" 'face 'org-tag) "${title:*} " (propertize "${tags:10}" 'face 'font-lock-comment-face)))
 
 (setq org-roam-capture-templates
-      '(("d" "default" plain "%?"
-         :if-new (file+head "%<%Y%m%d%H%M%S>-${slug}.org" "#+title: ${title}\n#+date: %U\n#+filetags: miscs Inbox\n\n")
+      '(("b" "brain" plain "%?"
+         :if-new (file+head "brain/%<%Y%m%d%H%M%S>-${slug}.org" "#+title: ${title}\n#+date: %U\n\n")
+         :immediate-finish t
          :unnarrowed t)
-        ("a" "articles" plain (file "~/org/templates/articles.org")
-         :if-new (file+head "%<%Y%m%d%H%M%S>-${slug}.org" "#+title: ${title}\n#+date: %U\n#+filetags: articles %^{Tag}\n\n")
+        ("r" "reference" plain "%?"
+         :if-new (file+head "reference/${citekey}.org" "#+title: ${title}\n\n")
+         :immediate-finish t
          :unnarrowed t)
-        ("b" "book notes" plain (file "~/org/templates/book.org")
-         :if-new (file+head "%<%Y%m%d%H%M%S>-${slug}.org" "#+title: ${title}\n#+date: %U\n#+filetags: books %^{Tag}\n\n")
-         :unnarrowed t)
-        ("c" "podcasts" plain (file "~/org/templates/podcasts.org")
-         :if-new (file+head "%<%Y%m%d%H%M%S>-${slug}.org" "#+title: ${title}\n#+date: %U\n#+filetags: podcasts %^{Tag}\n\n")
-         :unnarrowed t)
-        ("e" "latex" plain (file "~/org/templates/reportex.org")
-         :if-new (file+head "%<%Y%m%d%H%M%S>-${slug}.org" "#+title: ${title}\n#+date: %U\n#+filetags: miscs %^{Unit Code}\n\n")
-         :unnarrowed t)
-        ("i" "ideas" plain (file "~/org/templates/ideas.org")
-         :if-new (file+head "%<%Y%m%d%H%M%S>-${slug}.org" "#+title: ${title}\n#+date: %U\n#+filetags: ideas %^{Tag}\n\n")
-         :unnarrowed t)
-        ("p" "project" plain (file "~/org/templates/project.org")
-         :if-new (file+head "%<%Y%m%d%H%M%S>-${slug}.org" "#+title: ${title}\n#+date: %U\n#+filetags: projects %^{Tag}\n\n")
-         :unnarrowed t)
-        ("P" "presentation" plain (file "~/org/templates/presentation.org")
-         :if-new (file+head "%<%Y%m%d%H%M%S>-${slug}.org" "\n:reveal_properties:\n#+reveal_root: https://cdn.jsdelivr.net/npm/reveal.js\n:end:\n\n#+title: ${title}\n#+date: %U\n#+author: %^{Author}\n#+filetags: presentations \n\n")
-         :unnarrowed t)
-        ("r" "research paper" plain (file "~/org/templates/research.org")
-         :if-new (file+head "%<%Y%m%d%H%M%S>-${slug}.org" "#+title: ${title}\n#+date: %U\n#+filetags: papers %^{Tag}\n\n")
+        ("p" "project" plain "* Goals\n\n%?\n\n* Tasks\n\n** TODO Add initial tasks\n\n* Dates\n\n"
+         :if-new (file+head "project/%<%Y%m%d%H%M%S>-${slug}.org" "#+title: ${title}\n#+category: ${title}\n#+date: %U\n#+filetags: Projects\n\n")
+         :immediate-finish t
          :unnarrowed t)
         ("t" "tag" plain "%?"
-         :if-new (file+head "%<%Y%m%d%H%M%S>-${slug}.org" "#+title: ${title}\n#+filetags: Tag\n\n")
+         :if-new (file+head "tag/${slug}.org" "#+title: ${title}\n\n")
+         :immediate-finish t
          :unnarrowed t)
         ))
 
 (setq org-roam-dailies-capture-templates
-      '(("d" "default" entry "* %<%I:%M %p>: %?"
-         :if-new (file+head "%<%Y-%m-%d>.org" "#+title: %<%Y-%m-%d>\n"))))
+      '(("d" "default" entry "* %?"
+         :if-new (file+head "journal/%<%Y-%m-%d>.org" "#+title: %<%Y-%m-%d> Journal\n\n")
+         :unnarrowed t)))
 
-(defun elk/org-roam-copy-todo-to-today ()
+(defun elk/org-roam-project-finalize-hook ()
+  "Adds the captured project file to `org-agenda-files' if the
+capture was not aborted."
+  ;; Remove the hook since it was added temporarily
+  (remove-hook 'org-capture-after-finalize-hook #'elk/org-roam-project-finalize-hook)
+
+  ;; Add project file to the agenda list if the capture was confirmed
+  (unless org-note-abort
+    (with-current-buffer (org-capture-get :buffer)
+      (add-to-list 'org-agenda-files (buffer-file-name)))))
+
+(defun elk/org-roam-capture-task ()
   (interactive)
-  (let ((org-refile-keep t) ;; Set this to nil to delete the original!
-        (org-roam-dailies-capture-templates
-         '(("t" "tasks" entry "%?"
-            :if-new (file+head+olp "%<%Y-%m-%d>.org" "#+title: %<%Y-%m-%d>\n" ("Tasks")))))
-        (org-after-refile-insert-hook #'save-buffer)
-        today-file
-        pos)
-    (save-window-excursion
-      (org-roam-dailies--capture (current-time) t)
-      (setq today-file (buffer-file-name))
-      (setq pos (point)))
+  ;; Add the project file to the agenda after capture is finished
+  (add-hook 'org-capture-after-finalize-hook #'elk/org-roam-project-finalize-hook)
 
-    ;; Only refile if the target file is different than the current file
-    (unless (equal (file-truename today-file)
-                   (file-truename (buffer-file-name)))
-      (org-refile nil nil (list "Tasks" today-file nil pos)))))
-
-(add-to-list 'org-after-todo-state-change-hook
-             (lambda ()
-               (when (equal org-state "DONE")
-                 (elk/org-roam-copy-todo-to-today))))
+  ;; Capture the new task, creating the project file if necessary
+  (org-roam-capture- :node (org-roam-node-read
+                            nil
+                            (elk/org-roam-filter-by-tag "Project"))
+                     :templates '(("p" "project" plain "** TODO %?"
+                                   :if-new (file+head "project/%<%Y%m%d%H%M%S>-${slug}.org" "#+title: ${title}\n#+category: ${title}\n#+date: %U\n#+filetags: Projects\n\n"("Tasks"))
+                                   ))))
 
 (defun elk/org-roam-filter-by-tag (tag-name)
   (lambda (node)
@@ -2677,7 +2696,9 @@ Meant for `org-mode-hook'."
 ;; Build the agenda list the first time for the session
 (add-hook 'org-roam-mode-hook #'elk/org-roam-refresh-agenda-list)
 
-(org-roam-db-autosync-mode)) ;; End of org-roam block
+(org-roam-db-autosync-mode)
+(elk/org-roam-refresh-agenda-list) ;; Build the agenda list the first time for the session
+) ;; End of org-roam block
 
 (use-package websocket
   :after org-roam)
@@ -2695,6 +2716,8 @@ Meant for `org-mode-hook'."
         org-cite-follow-processor 'citar
         org-cite-activate-processor 'citar)
 
+  (setq citar-bibliography (directory-files-recursively "~/dox/bib/" "\\.bib$"))
+
   ;; `org-cite'
   (setq org-cite-global-bibliography citar-bibliography
         ;; Setup export processor; default csl/citeproc-el, with biblatex for latex
@@ -2702,18 +2725,18 @@ Meant for `org-mode-hook'."
         org-support-shift-select t))
 
 (use-package org-roam-bibtex
-  :after org-roam)
-
+  :after org-roam
+  :hook (org-roam-mode . org-roam-bibtex-mode))
 
 (use-package org-noter
-  :defer t
+  :after (:any org pdf-view)
   :config
   (setq org-noter-notes-search-path (list org-directory)
         org-noter-auto-save-last-location t
         org-noter-separate-notes-from-heading t))
 
 (use-package popwin
-  :defer 1
+  :defer 0
   :config
   (popwin-mode 1))
 
@@ -2724,13 +2747,9 @@ Meant for `org-mode-hook'."
   (setq xref-show-definitions-function #'xref-show-definitions-completing-read))
 
 (use-package consult-org-roam
-  :disabled t
-  :init
-  ;; Activate the minor-mode
-  (consult-org-roam-mode 1)
-  :custom
-  (consult-org-roam-grep-func #'consult-ripgrep)
+  :hook (org-roam-mode . consult-org-roam-mode)
   :config
+  (setq consult-org-roam-grep-func #'consult-ripgrep)
   ;; Eventually suppress previewing for certain functions
   (consult-customize
    consult-org-roam-forward-links
@@ -2747,9 +2766,6 @@ Meant for `org-mode-hook'."
 (use-package centered-cursor-mode :diminish centered-cursor-mode)
 (use-package restart-emacs :defer t)
 (use-package diminish)
-(use-package beacon
-  :commands beacon-mode
-  :hook (after-init-hook . beacon-mode))
 
 (use-package bufler
   :general
@@ -2759,6 +2775,8 @@ Meant for `org-mode-hook'."
   :commands (deft)
   :config
   (setq deft-directory org-roam-directory
+        deft-strip-summary-regexp ":PROPERTIES:\n\\(.+\n\\)+:END:\n"
+        deft-use-filename-as-title t
         deft-recursive t
         deft-extensions '("md" "org")))
 
@@ -2858,25 +2876,24 @@ Meant for `org-mode-hook'."
 (use-package elfeed
   :commands elfeed
   :general
-  (general-def
-    :states 'motion
-    :keymaps 'elfeed-search-mode-map
-    "r" #'elfeed-search-update--force
-    (kbd "RET") #'elfeed-search-show-entry
-    (kbd "M-RET") #'elfeed-search-browse-url
+  (:states 'motion
+           :keymaps 'elfeed-search-mode-map
+           "r" #'elfeed-search-update--force
+           (kbd "RET") #'elfeed-search-show-entry
+           (kbd "M-RET") #'elfeed-search-browse-url
 
-    "gr" #'elfeed-search-update--force
-    "gR" #'elfeed-search-fetch
+           "gr" #'elfeed-search-update--force
+           "gR" #'elfeed-search-fetch
 
-    "v" nil
-    "v" #'elfeed-view-mpv
-    "t" #'elfeed-w3m-open
-    "w" #'elfeed-eww-open
-    "f" nil
-    "f" #'elfeed-firefox-open
-    "c" #'elfeed-chromium-open)
-  (general-def
-    :states 'motion
+           "v" nil
+           "v" #'elfeed-view-mpv
+           "t" #'elfeed-w3m-open
+           "w" #'elfeed-eww-open
+           "f" nil
+           "f" #'elfeed-firefox-open
+           "c" nil
+           "c" #'elfeed-chromium-open)
+  (:states 'motion
     :keymaps 'elfeed-show-mode-map
     "q" #'elfeed-kill-buffer
     [remap next-buffer]     #'+rss/next
@@ -2905,6 +2922,11 @@ Meant for `org-mode-hook'."
   (setq rmh-elfeed-org-files '("~/org/elfeed.org"))
   :config
   (elfeed-org))
+
+(use-package elfeed-summary
+  :commands elfeed-summary
+  :config
+  (setq elfeed-summary-filter-by-title t))
 
 (use-package auctex
   :defer t
@@ -2936,28 +2958,16 @@ Meant for `org-mode-hook'."
         TeX-view-program-list '(("PDF Tools" TeX-pdf-tools-sync-view))
         TeX-source-correlate-start-server t)
   :general
-  (general-define-key
-    :prefix ","
-    :states 'normal
-    :keymaps 'LaTeX-mode-map
-    "" nil
-    "a" '(TeX-command-run-all :which-key "TeX run all")
-    "c" '(TeX-command-master :which-key "TeX-command-master")
-    "c" '(TeX-command-master :which-key "TeX-command-master")
-    "e" '(LaTeX-environment :which-key "Insert environment")
-    "s" '(LaTeX-section :which-key "Insert section")
-    "m" '(TeX-insert-macro :which-key "Insert macro")
-    )
-
-  )
+  (elk-localleader-def
+   :keymaps 'LaTeX-mode-map
+   "a" '(TeX-command-run-all :which-key "TeX run all")
+   "c" '(TeX-command-master :which-key "TeX-command-master")
+   "e" '(LaTeX-environment :which-key "Insert environment")
+   "s" '(LaTeX-section :which-key "Insert section")
+   "m" '(TeX-insert-macro :which-key "Insert macro")
+   ))
 
 (add-hook 'TeX-after-compilation-finished-functions #'TeX-revert-document-buffer) ;; Standard way
-
-(use-package company-auctex
-  :after auctex
-  :init
-  (add-to-list 'company-backends 'company-auctex)
-  (company-auctex-init))
 
 (use-package magit
   :commands (magit magit-status)
@@ -2988,39 +2998,35 @@ Meant for `org-mode-hook'."
   (add-hook 'mw-thesaurus-mode-hook (lambda () (define-key evil-normal-state-local-map (kbd "q") 'mw-thesaurus--quit))))
 
 (use-package pdf-tools
-  :defer t
-  :mode  ("\\.pdf\\'" . pdf-view-mode)
+  :magic ("%PDF" . pdf-view-mode)
   :config
-  (pdf-loader-install)
-  (setq-default pdf-view-display-size 'fit-height)
-  (setq pdf-view-continuous nil) ;; Makes it so scrolling down to the bottom/top of a page doesn't switch to the next page
+  (pdf-loader-install :no-query)
   (setq pdf-view-midnight-colors '("#ffffff" . "#121212" )) ;; I use midnight mode as dark mode, dark mode doesn't seem to work
   :general
-  (general-define-key :states 'motion :keymaps 'pdf-view-mode-map
-                      "j" 'pdf-view-next-line-or-next-page
-                      "k" 'pdf-view-previous-line-or-previous-page
+  (:states 'motion :keymaps 'pdf-view-mode-map
+           "j" 'pdf-view-next-line-or-next-page
+           "k" 'pdf-view-previous-line-or-previous-page
 
-                      "C-j" 'pdf-view-next-line-or-next-page
-                      "C-k" 'pdf-view-previous-line-or-previous-page
+           "C-j" 'pdf-view-next-line-or-next-page
+           "C-k" 'pdf-view-previous-line-or-previous-page
 
-                      ;; Arrows for movement as well
-                      (kbd "<down>") 'pdf-view-next-line-or-next-page
-                      (kbd "<up>") 'pdf-view-previous-line-or-previous-page
+           ;; Arrows for movement as well
+           (kbd "<down>") 'pdf-view-next-line-or-next-page
+           (kbd "<up>") 'pdf-view-previous-line-or-previous-page
 
-                      (kbd "<left>") 'image-backward-hscroll
-                      (kbd "<right>") 'image-forward-hscroll
+           (kbd "<left>") 'image-backward-hscroll
+           (kbd "<right>") 'image-forward-hscroll
 
-                      "H" 'pdf-view-fit-height-to-window
-                      "0" 'pdf-view-fit-height-to-window
-                      "W" 'pdf-view-fit-width-to-window
-                      "=" 'pdf-view-enlarge
-                      "-" 'pdf-view-shrink
+           "H" 'pdf-view-fit-height-to-window
+           "0" 'pdf-view-fit-height-to-window
+           "W" 'pdf-view-fit-width-to-window
+           "=" 'pdf-view-enlarge
+           "-" 'pdf-view-shrink
 
-                      "q" 'quit-window
-                      "Q" 'kill-this-buffer
-                      "g" 'revert-buffer
-                      )
-  )
+           "q" 'quit-window
+           "Q" 'kill-this-buffer
+           "g" 'revert-buffer
+           ))
 
 (use-package popper
   :general
@@ -3044,7 +3050,7 @@ Meant for `org-mode-hook'."
 
 (use-package eglot
   :commands eglot eglot-ensure
-  :init
+  :config
   (setq eglot-sync-connect 1
         eglot-connect-timeout 10
         eglot-autoshutdown t
@@ -3052,12 +3058,13 @@ Meant for `org-mode-hook'."
         ;; NOTE We disable eglot-auto-display-help-buffer because :select t in
         ;;      its popup rule causes eglot to steal focus too often.
         eglot-auto-display-help-buffer nil)
-  (setq eglot-stay-out-of '(flymake)))
+  (setq eglot-stay-out-of '(flymake))
+  (push :workspace/didChangeWorkspaceFolders eglot-ignored-server-capabilities))
 
 (use-package consult-eglot
   :after eglot consult vertico
   :general
-  (general-define-key :keymaps 'eglot-mode-map [remap xref-find-apropos] #'consult-eglot-sympbols))
+  (:keymaps 'eglot-mode-map [remap xref-find-apropos] #'consult-eglot-sympbols))
 
 (add-hook 'c-mode-hook 'eglot-ensure)
 (add-hook 'sh-mode-hook 'eglot-ensure)
@@ -3069,9 +3076,7 @@ Meant for `org-mode-hook'."
 (use-package rainbow-mode
   :defer t)
 
-
 (use-package hl-todo
-  :defer t
   :hook (prog-mode . hl-todo-mode)
   :config
   (setq hl-todo-keyword-faces
@@ -3086,15 +3091,20 @@ Meant for `org-mode-hook'."
 
 ;; A better python mode (supposedly)
 (use-package python-mode
+  :mode ("\\.py\\'" . python-mode)
+  :interpreter ("python" . python-mode)
   :hook (python-mode . eglot-ensure)
-  :defer t)
+  :init
+   ;; Stop the spam!
+  (setq python-indent-guess-indent-offset-verbose nil)
+  :config
+  (setq python-indent-guess-indent-offset-verbose nil))
 
 ;; Using my virtual environments
 (use-package pyvenv
   :defer t
   :init
   (setenv "WORKON_HOME" "~/.pyenv/versions")) ;; Where the virtual envs are stored on my computer
-
 
 ;; Automatically set the virtual environment when entering a directory
 (use-package auto-virtualenv
@@ -3110,19 +3120,14 @@ Meant for `org-mode-hook'."
 ;;   (advice-add 'python-mode :before 'elpy-enable))
 
 (use-package web-mode
-  :defer t
-  :init
-  (add-to-list 'auto-mode-alist '("\\.html\\'" . web-mode)) ;; Open .html files in web-mode
+  :mode ("\\.html\\'" . web-mode) ;; Open .html files in web-mode
   :config
   (setq web-mode-enable-current-element-highlight t
         web-mode-enable-current-column-highlight t)
 
   :general
-  (general-def
-  :prefix ","
-  :states 'motion
+  (elk-localleader-def
   :keymaps 'web-mode-map
-  "" nil
   "i" '(web-mode-buffer-indent :which-key "web mode indent")
   "c" '(web-mode-fold-or-unfold :which-key "web mode toggle fold")
   ))
@@ -3137,39 +3142,35 @@ Meant for `org-mode-hook'."
   :commands sudo-edit sudo-edit-find-file)
 
 (use-package vterm
-  :commands vterm)
-
-(use-package multi-vterm
-  :commands (multi-vterm)
+  :commands vterm-mode vterm vterm-other-window
+  :hook (vterm-mode . hide-mode-line-mode)
   :config
-  (add-hook 'vterm-mode-hook
-			(lambda ()
-			  (setq-local evil-insert-state-cursor 'box)
-			  (evil-insert-state)))
-  (define-key vterm-mode-map [return]                      #'vterm-send-return)
-  (setq vterm-keymap-exceptions nil)
-  (evil-define-key 'insert vterm-mode-map (kbd "C-e")      #'vterm--self-insert)
-  (evil-define-key 'insert vterm-mode-map (kbd "C-f")      #'vterm--self-insert)
-  (evil-define-key 'insert vterm-mode-map (kbd "C-a")      #'vterm--self-insert)
-  (evil-define-key 'insert vterm-mode-map (kbd "C-v")      #'vterm--self-insert)
-  (evil-define-key 'insert vterm-mode-map (kbd "C-b")      #'vterm--self-insert)
-  (evil-define-key 'insert vterm-mode-map (kbd "C-w")      #'vterm--self-insert)
-  (evil-define-key 'insert vterm-mode-map (kbd "C-u")      #'vterm--self-insert)
-  (evil-define-key 'insert vterm-mode-map (kbd "C-d")      #'vterm--self-insert)
-  (evil-define-key 'insert vterm-mode-map (kbd "C-n")      #'vterm--self-insert)
-  (evil-define-key 'insert vterm-mode-map (kbd "C-m")      #'vterm--self-insert)
-  (evil-define-key 'insert vterm-mode-map (kbd "C-p")      #'vterm--self-insert)
-  (evil-define-key 'insert vterm-mode-map (kbd "C-j")      #'vterm--self-insert)
-  (evil-define-key 'insert vterm-mode-map (kbd "C-k")      #'vterm--self-insert)
-  (evil-define-key 'insert vterm-mode-map (kbd "C-r")      #'vterm--self-insert)
-  (evil-define-key 'insert vterm-mode-map (kbd "C-t")      #'vterm--self-insert)
-  (evil-define-key 'insert vterm-mode-map (kbd "C-g")      #'vterm--self-insert)
-  (evil-define-key 'insert vterm-mode-map (kbd "C-c")      #'vterm--self-insert)
-  (evil-define-key 'insert vterm-mode-map (kbd "C-SPC")    #'vterm--self-insert)
-  (evil-define-key 'normal vterm-mode-map (kbd "C-d")      #'vterm--self-insert)
-  (evil-define-key 'normal vterm-mode-map (kbd ",c")       #'multi-vterm)
-  (evil-define-key 'normal vterm-mode-map (kbd ",n")       #'multi-vterm-next)
-  (evil-define-key 'normal vterm-mode-map (kbd ",p")       #'multi-vterm-prev)
-  (evil-define-key 'normal vterm-mode-map (kbd "i")        #'evil-insert-resume)
-  (evil-define-key 'normal vterm-mode-map (kbd "o")        #'evil-insert-resume)
-  (evil-define-key 'normal vterm-mode-map (kbd "<return>") #'evil-insert-resume))
+  ;; Once vterm is dead, the vterm buffer is useless. Why keep it around? We can
+  ;; spawn another if want one.
+  (setq vterm-kill-buffer-on-exit t)
+
+  ;; 5000 lines of scrollback, instead of 1000
+  (setq vterm-max-scrollback 5000)
+
+  (add-hook 'vterm-mode-hook confirm-kill-processes nil)
+  (add-hook 'vterm-mode-hook hscroll-margin 0))
+
+(use-package vterm-toggle
+  :config
+  (setq vterm-toggle-fullscreen-p nil)
+  (add-to-list 'display-buffer-alist
+               '((lambda (buffer-or-name _)
+                   (let ((buffer (get-buffer buffer-or-name)))
+                     (with-current-buffer buffer
+                       (or (equal major-mode 'vterm-mode)
+                           (string-prefix-p vterm-buffer-name (buffer-name buffer))))))
+                 (display-buffer-reuse-window display-buffer-at-bottom)
+                 ;;(display-buffer-reuse-window display-buffer-in-direction)
+                 ;;display-buffer-in-direction/direction/dedicated is added in emacs27
+                 ;;(direction . bottom)
+                 (dedicated . t) ;dedicated is supported in emacs27
+                 (reusable-frames . visible)
+                 (window-height . 0.3))))
+
+;; Make gc pauses faster by decreasing the threshold.
+(setq gc-cons-threshold (* 2 1000 1000))
