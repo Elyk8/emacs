@@ -844,7 +844,7 @@ If the universal prefix argument is used then will the windows too."
     :global-prefix "M-SPC")
   
   (general-create-definer elk-localleader-def
-    :states '(normal insert visual motion emacs)
+    :states '(normal visual motion emacs)
     :prefix ",")
 
   (general-evil-setup t)
@@ -1013,15 +1013,15 @@ If the universal prefix argument is used then will the windows too."
   "" '(:which-key "toggles")
   "/" '(comment-line :which-key "comment")
   "T" '(toggle-truncate-lines :which-key "truncate lines")
-  "v" '(visual-line-mode :which-key "visual line mode")
-  "n" '(display-line-numbers-mode :which-key "display line numbers")
   "a" '(mixed-pitch-mode :which-key "variable pitch mode")
   "c" '(visual-fill-column-mode :which-key "visual fill column mode")
-  "t" '(load-theme :which-key "load theme")
-  "w" '(writeroom-mode :which-key "writeroom-mode")
-  "R" '(read-only-mode :which-key "read only mode")
   "I" '(toggle-input-method :which-key "toggle input method")
-  "r" '(display-fill-column-indicator-mode :which-key "fill column indicator"))
+  "n" '(display-line-numbers-mode :which-key "display line numbers")
+  "r" '(display-fill-column-indicator-mode :which-key "fill column indicator")
+  "R" '(read-only-mode :which-key "read only mode")
+  "t" '(load-theme :which-key "load theme")
+  "v" '(visual-line-mode :which-key "visual line mode")
+  "w" '(writeroom-mode :which-key "writeroom-mode"))
 
 (elk-leader-def
  :infix "w"
@@ -2053,6 +2053,7 @@ folder, otherwise delete a word"
     (org-super-agenda-mode))
 
 (use-package org-superstar
+  :disabled t
   :hook (org-mode . org-superstar-mode)
   :config
   (setq org-superstar-headline-bullets-list '("◉" "○" "✸" "✿" "✤" "✜" "◆" "▶")
@@ -2074,7 +2075,19 @@ folder, otherwise delete a word"
   )
 
 ;; Removes gap when you add a new heading
-(setq org-blank-before-new-entry '((heading . nil) (plain-list-item . nil)))
+;;(setq org-blank-before-new-entry '((heading . nil) (plain-list-item . nil)))
+
+(use-package org-modern
+  :custom
+  (org-modern-hide-stars nil) ; adds extra indentation
+  :hook
+  (org-mode . org-modern-mode)
+  (org-agenda-finalize . org-modern-agenda))
+
+(use-package org-modern-indent
+  :straight (:host github :repo "jdtsmith/org-modern-indent")
+  :hook
+  (org-mode . org-modern-indent-mode))
 
 (use-package evil-org
   :hook (org-mode . evil-org-mode)
@@ -2181,7 +2194,7 @@ folder, otherwise delete a word"
    '(org-ellipsis ((t (:inherit shadow :height 0.8))))
    '(org-link ((t (:foreground "royal blue" :underline t)))))
 
-  (mixed-pitch-mode 1)
+  ;; (mixed-pitch-mode 1)
   )
 
 (defun elk/prettify-symbols-setup ()
@@ -2253,7 +2266,7 @@ Meant for `org-mode-hook'."
   :hook (org-mode . elk/org-setup)
   :hook (org-mode . elk/prettify-symbols-setup)
   :hook (org-mode . elk/org-font-setup)
-  ;;:hook (org-mode . locally-defer-font-lock)
+  :hook (org-mode . locally-defer-font-lock)
   :hook (org-capture-mode . evil-insert-state) ;; Start org-capture in Insert state by default
   :diminish org-indent-mode
   :diminish visual-line-mode
@@ -2548,7 +2561,7 @@ Meant for `org-mode-hook'."
   (setq org-hugo-base-dir "~/Dropbox/Projects/cpb"))
 
 (setq org-latex-listings t) ;; Uses listings package for code exports
-(setq org-latex-compiler "xelatex") ;; XeLaTex rather than pdflatex
+(setq org-latex-compiler "lualatex") ;; LuaLaTex rather than pdflatex
 
 ;; not sure what this is, look into it
 ;; '(org-latex-active-timestamp-format "\\texttt{%s}")
@@ -2570,7 +2583,7 @@ Meant for `org-mode-hook'."
   )
 
 (setq org-clock-mode-line-total 'current) ;; Show only timer from current clock session in modeline
-(setq org-attach-id-dir ".org-attach/")
+(setq-default org-attach-id-dir (expand-file-name ".attach/" org-directory))
 
 ) ;; This parenthesis ends the org use-package.
 
