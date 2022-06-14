@@ -1,7 +1,10 @@
 ; -*- lexical-binding: t; -*-
 
-;; Garbage Collections
+;; The default is 800 kilobytes.  Measured in bytes.
+(setq gc-cons-threshold (* 50 1000 1000))
 (setq gc-cons-percentage 0.6)
+
+(setq read-process-output-max (* 1024 1024))
 
 ;; Compile warnings
 ;;  (setq warning-minimum-level :emergency)

@@ -23,6 +23,7 @@ network-security.data
 places
 semanticdb
 server/
+straight/
 smex-items
 tramp
 transient/
@@ -34,3 +35,6 @@ var/
 *.fas
 *.dat
 *.eld
+
+# old files
+*.old
