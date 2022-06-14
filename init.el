@@ -2116,11 +2116,7 @@ folder, otherwise delete a word"
   :hook (org-mode . org-auto-tangle-mode))
 
 (use-package ox-reveal
-<<<<<<< HEAD
   :after org)
-=======
-  :defer 1)
->>>>>>> 4e9bb3382a451abb3596164dc190541e66cf09aa
 
 (defun elk/org-download-paste-clipboard (&optional use-default-filename)
   (interactive "P")

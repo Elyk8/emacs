@@ -2437,6 +2437,7 @@ selectively for each Org file where it is desired.
 #+begin_src emacs-lisp
 (use-package ox-reveal
   :after org)
+#+end_src
 *** Org-download
 #+begin_src emacs-lisp
 (defun elk/org-download-paste-clipboard (&optional use-default-filename)
