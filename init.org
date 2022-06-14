@@ -2424,7 +2424,7 @@ selectively for each Org file where it is desired.
 *** Org-reveal
 #+BEGIN_SRC emacs-lisp
 (use-package ox-reveal
-    :defer 5)
+  :after org)
 #+END_SRC
 *** Org-download
 #+begin_src emacs-lisp
