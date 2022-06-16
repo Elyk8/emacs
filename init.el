@@ -17,6 +17,8 @@
 
 (setq straight-use-package-by-default t)
 (setq use-package-verbose nil)
+;; Load the helper package for commands like `straight-x-clean-unused-repos'
+(require 'straight-x)
 
 ;; Thanks but no thanks
 (setq inhibit-startup-screen t)
@@ -69,7 +71,7 @@
   (setq elk-doom-modeline-text-height 140))
 
 (setq elk/init.org (expand-file-name "init.org" user-emacs-directory))
-(setq org-directory (file-truename "~/org"))
+(setq org-directory (file-truename "~/Documents/org"))
 (setq org-roam-directory org-directory)
 
 (defun elk/split-window-vertically-and-switch ()
@@ -241,6 +243,20 @@ the todo type was if I look back through my archive files."
     (when (or refresh (not overlays))
       (org-display-inline-images t t beg end)
       t)))
+
+(defun +org-get-todo-keywords-for (&optional keyword)
+  "Returns the list of todo keywords that KEYWORD belongs to."
+  (when keyword
+    (cl-loop for (type . keyword-spec)
+             in (cl-remove-if-not #'listp org-todo-keywords)
+             for keywords =
+             (mapcar (lambda (x) (if (string-match "^\\([^(]+\\)(" x)
+                                     (match-string 1 x)
+                                   x))
+                     keyword-spec)
+             if (eq type 'sequence)
+             if (member keyword keywords)
+             return keywords)))
 
 ;;;###autoload
 (defun +org/dwim-at-point (&optional arg)
@@ -552,11 +568,11 @@ If the universal prefix argument is used then will the windows too."
 ;; A cool mode to revert window configurations.
 (winner-mode 1)
 
-;; Automatically revert buffers for changed files
-(setq global-auto-revert-non-file-buffers t)
-
 ;; Revert buffers when the underlying file has changed
 (global-auto-revert-mode 1)
+
+;; Automatically revert buffers for changed files
+(setq global-auto-revert-non-file-buffers t)
 
 ;; INTERACTION -----
 
@@ -569,7 +585,7 @@ If the universal prefix argument is used then will the windows too."
 ;; Major mode of new buffers
 (setq initial-major-mode 'lisp-interaction-mode)
 
-;; WINDOW -----------
+;; WINDOW ----------
 
 ;; Don't resize the frames in steps; it looks weird, especially in tiling window
 ;; managers, where it can leave unseemly gaps.
@@ -581,6 +597,14 @@ If the universal prefix argument is used then will the windows too."
 
 ;; When opening a file (like double click) on Mac, use an existing frame
 (setq ns-pop-up-frames nil)
+
+;; Disable warning when setting up local variables
+(setq enable-local-variables :all)
+
+;; BOOKMARKS -------
+
+;; Everytime a bookmark is changed, automatically save it
+(setq bookmark-save-flag 1)
 
 ;; LINES -----------
 (setq-default truncate-lines t)
@@ -611,7 +635,6 @@ If the universal prefix argument is used then will the windows too."
 ;; SCROLLING ---------
 ;; (setq mouse-wheel-scroll-amount '(1 ((shift) . 5) ((control) . nil)))
 (setq scroll-conservatively 101)
-
 
 (setq ;; If the frame contains multiple windows, scroll the one under the cursor
  ;; instead of the one that currently has keyboard focus.
@@ -880,7 +903,9 @@ If the universal prefix argument is used then will the windows too."
   ;; "bx" '(xwidget-webkit-browse-url :which-key "xwidget")
 
   "d" '(dired :which-key "dired-jump")
-  "D" '(dired-recent-open :wk "dired history"))
+  "D" '(dired-recent-open :wk "dired history")
+
+  "m" '(magit-status :wk "magit"))
 
 (elk-leader-def
  :infix "b"
@@ -1216,6 +1241,7 @@ If the universal prefix argument is used then will the windows too."
 ;; Many of these are emulating standard Emacs bindings in Evil insert mode, such as C-a, or C-e.
 (general-def
   :states '(insert)
+  "C-SPC" 'completion-at-point
   "C-a" 'evil-beginning-of-visual-line
   "C-e" 'evil-end-of-visual-line
   "C-S-a" 'evil-beginning-of-line
@@ -1297,8 +1323,6 @@ _q_uit        _e_qualize         _]_forward      ^
             "<return>" #'corfu-insert
             "C-d" #'corfu-show-documentation
             "C-l" #'corfu-show-location)
-  (:states 'insert
-           "C-SPC" 'completion-at-point)
   ;; Optional customizations
   :custom
   (corfu-auto nil)        ; Only use `corfu' when calling `completion-at-point' or
@@ -1425,6 +1449,7 @@ folder, otherwise delete a word"
   (:keymaps 'vertico-map
             "<tab>" #'vertico-insert  ; Insert selected candidate into text area
             "<escape>" #'abort-minibuffers ; Close minibuffer
+            "<return>" #'exit-minibuffer
             "C-j" #'vertico-next
             "C-k" #'vertico-previous
             "C-f" #'vertico-exit
@@ -1453,7 +1478,6 @@ folder, otherwise delete a word"
 
   ;; These commands are problematic and automatically show the *Completions* buffer
   (advice-add #'tmm-add-prompt :after #'minibuffer-hide-completions)
-
   )
 
 ;; A few more useful configurations...
@@ -1608,6 +1632,21 @@ folder, otherwise delete a word"
 (use-package consult-flycheck
   :after (consult flycheck))
 
+
+(use-package consult-org-roam
+  :after org-roam
+  :hook (org-roam-mode . consult-org-roam-mode)
+  :config
+  (setq consult-org-roam-grep-func #'consult-ripgrep)
+  ;; Eventually suppress previewing for certain functions
+  (consult-customize
+   consult-org-roam-forward-links
+   :preview-key (kbd "M-."))
+  :bind
+  ("C-c n e" . consult-org-roam-file-find)
+  ("C-c n b" . consult-org-roam-backlinks)
+  ("C-c n r" . consult-org-roam-search))
+
 (use-package embark
   :bind
   (("C-." . embark-act)         ;; pick some comfortable binding
@@ -1678,7 +1717,7 @@ folder, otherwise delete a word"
         sp-highlight-wrap-overlay nil
         sp-highlight-wrap-tag-overlay nil)
 
-  (with-eval-after-load 'evil-mode
+  (with-eval-after-load 'evil
     (setq sp-show-pair-from-inside t)
     (setq sp-cancel-autoskip-on-backward-movement nil)
     (setq sp-pair-overlay-keymap (make-sparse-keymap)))
@@ -1758,7 +1797,7 @@ folder, otherwise delete a word"
 
 (use-package dired
   :straight (:type built-in)
-  :defer t
+  :hook (dired-mode . dired-async-mode)
   :commands (dired dired-jump)
   :bind (("C-x C-j" . dired-jump))
   :init
@@ -1783,6 +1822,9 @@ folder, otherwise delete a word"
     "H" 'dired-omit-mode
     "l" 'dired-single-buffer))
 
+(use-package dired-single
+ :after dired)
+
 (use-package dired-recent
   :after dired
   :commands dired-recent-open
@@ -1802,8 +1844,11 @@ folder, otherwise delete a word"
   :config
   ;; Doesn't work as expected!
   ;;(add-to-list 'dired-open-functions #'dired-open-xdg t)
-  (setq dired-open-extensions '(("png" . "nsxiv")
-                                ("mkv" . "mpv"))))
+ (setq dired-open-extensions '(("gif" . "open")
+                              ("jpg" . "open")
+                              ("png" . "open")
+                              ("mkv" . "open")
+                              ("mp4" . "open"))))
 
 (use-package dired-hide-dotfiles
   :after dired
@@ -1941,31 +1986,38 @@ folder, otherwise delete a word"
   (unicode-fonts-setup))
 
 ;; Disables showing system load in modeline, useless anyway
-  (setq display-time-default-load-average nil)
+(setq display-time-default-load-average nil)
 
-  (line-number-mode)
-  (column-number-mode)
-  (display-time-mode -1)
-  (size-indication-mode -1)
+(line-number-mode)
+(column-number-mode)
+(display-time-mode -1)
+(size-indication-mode -1)
 
-  (use-package doom-modeline
-    :hook (after-init . doom-modeline-mode)
-    :config
-    (setq doom-modeline-buffer-file-name-style 'auto ;; Just show file name (no path)
-          doom-modeline-project-detection 'project
-          doom-modeline-enable-word-count t
-          doom-modeline-buffer-encoding nil
-          doom-modeline-icon t ;; Enable/disable all icons
-          doom-modeline-modal-icon t ;; Icon for Evil mode
-          doom-modeline-major-mode-icon t
-          doom-modeline-major-mode-color-icon t
-          doom-modeline-bar-width 3))
+(use-package doom-modeline
+  :hook (after-init . doom-modeline-mode)
+  :config
+  (setq doom-modeline-buffer-file-name-style 'auto ;; Just show file name (no path)
+        doom-modeline-project-detection 'project
+        doom-modeline-enable-word-count t
+        doom-modeline-buffer-encoding nil
+        doom-modeline-icon t ;; Enable/disable all icons
+        doom-modeline-modal-icon t ;; Icon for Evil mode
+        doom-modeline-major-mode-icon t
+        doom-modeline-major-mode-color-icon t
+        doom-modeline-bar-width 3))
 
-  (setq doom-modeline-height 1)
+(setq doom-modeline-height 1)
 
 (use-package hide-mode-line
   :defer t
   :hook (completion-list-mode-hook . hide-mode-line-mode))
+
+(defun split-horizontally-for-temp-buffers ()
+  "Split the window horizontally for temp buffers."
+  (when (and (one-window-p t)
+             (not (active-minibuffer-window)))
+    (split-window-horizontally)))
+(add-hook 'temp-buffer-setup-hook 'split-horizontally-for-temp-buffers)
 
 (use-package all-the-icons)
 
@@ -2012,6 +2064,9 @@ folder, otherwise delete a word"
 ;; This makes emacs transparent
 (set-frame-parameter (selected-frame) 'alpha '(95 . 95))
 (add-to-list 'default-frame-alist '(alpha . (95 . 95)))
+
+;; Make fill-paragraph (M-q) 100 characters long
+(setq-default fill-column 100)
 
 (use-package visual-fill-column
   :defer t
@@ -2168,7 +2223,7 @@ folder, otherwise delete a word"
 (add-to-list 'org-structure-template-alist '("json" . "src json"))
 
 ;; Org-agenda specific bindings
-(with-eval-after-load 'evil-mode
+(with-eval-after-load 'evil
   (evil-define-key 'motion org-agenda-mode-map
     (kbd "f") 'org-agenda-later
     (kbd "b") 'org-agenda-earlier))
@@ -2284,6 +2339,7 @@ Meant for `org-mode-hook'."
 
 (setq org-edit-src-content-indentation 0
       org-src-tab-acts-natively t
+      org-src-ask-before-returning-to-edit-buffer nil
       org-src-preserve-indentation t)
 
 ;; M-Ret can split lines on items and tables but not headlines and not on anything else (unconfigured)
@@ -2532,6 +2588,10 @@ Meant for `org-mode-hook'."
 
 (setq org-export-backends '(ascii beamer html latex md odt))
 
+;; I want docx document for MS Word compatibility
+(setq org-odt-preferred-output-format "docx")
+
+
 (setq org-export-with-broken-links t)
 (setq org-export-with-smart-quotes t)
 (setq org-export-allow-bind-keywords t)
@@ -2641,16 +2701,20 @@ Meant for `org-mode-hook'."
       (concat (propertize "${type:10}" 'face 'org-tag) "${title:*} " (propertize "${tags:10}" 'face 'font-lock-comment-face)))
 
 (setq org-roam-capture-templates
-      '(("b" "brain" plain "%?"
-         :if-new (file+head "brain/%<%Y%m%d%H%M%S>-${slug}.org" "#+title: ${title}\n#+date: %U\n\n")
+      '(("b" "brain" plain "\n%?"
+         :if-new (file+head "brain/%<%Y%m%d%H%M%S>-${slug}.org" "#+title: ${title}\n#+date: %U\n")
          :immediate-finish t
          :unnarrowed t)
-        ("r" "reference" plain "%?"
-         :if-new (file+head "reference/${citekey}.org" "#+title: ${title}\n\n")
+        ("r" "reference" plain "\n%?"
+         :if-new (file+head "reference/${citekey}.org" "#+title: ${title}\n#+date: %U\n")
          :immediate-finish t
          :unnarrowed t)
-        ("p" "project" plain "* Goals\n\n%?\n\n* Tasks\n\n** TODO Add initial tasks\n\n* Dates\n\n"
-         :if-new (file+head "project/%<%Y%m%d%H%M%S>-${slug}.org" "#+title: ${title}\n#+category: ${title}\n#+date: %U\n#+filetags: Projects\n\n")
+        ("a" "article" plain "\n%?"
+         :if-new (file+head "article/%<%Y%m%d%H%M%S>-${slug}.org" "#+title: ${title}\n#+date: %U\n#+filetags: Seedling\n")
+         :immediate-finish t
+         :unnarrowed t)
+        ("p" "project" plain "\n* Goals\n\n%?\n\n* Tasks\n\n** TODO Add initial tasks\n\n* Dates\n\n"
+         :if-new (file+head "project/%<%Y%m%d%H%M%S>-${slug}.org" "#+title: ${title}\n#+category: ${title}\n#+date: %U\n#+filetags: Project\n\n")
          :immediate-finish t
          :unnarrowed t)
         ("t" "tag" plain "%?"
@@ -2685,7 +2749,7 @@ capture was not aborted."
                             nil
                             (elk/org-roam-filter-by-tag "Project"))
                      :templates '(("p" "project" plain "** TODO %?"
-                                   :if-new (file+head "project/%<%Y%m%d%H%M%S>-${slug}.org" "#+title: ${title}\n#+category: ${title}\n#+date: %U\n#+filetags: Projects\n\n"("Tasks"))
+                                   :if-new (file+head "project/%<%Y%m%d%H%M%S>-${slug}.org" "#+title: ${title}\n#+category: ${title}\n#+date: %U\n#+filetags: Project\n\n"("Tasks"))
                                    ))))
 
 (defun elk/org-roam-filter-by-tag (tag-name)
@@ -2701,9 +2765,6 @@ capture was not aborted."
 (defun elk/org-roam-refresh-agenda-list ()
   (interactive)
   (setq org-agenda-files (elk/org-roam-list-notes-by-tag "projects")))
-
-;; Build the agenda list the first time for the session
-(add-hook 'org-roam-mode-hook #'elk/org-roam-refresh-agenda-list)
 
 (org-roam-db-autosync-mode)
 (elk/org-roam-refresh-agenda-list) ;; Build the agenda list the first time for the session
@@ -2725,7 +2786,7 @@ capture was not aborted."
         org-cite-follow-processor 'citar
         org-cite-activate-processor 'citar)
 
-  (setq citar-bibliography (directory-files-recursively "~/dox/bib/" "\\.bib$"))
+  (setq citar-bibliography (directory-files-recursively "~/Documents/bib/" "\\.bib$"))
 
   ;; `org-cite'
   (setq org-cite-global-bibliography citar-bibliography
@@ -2755,18 +2816,9 @@ capture was not aborted."
   :config
   (setq xref-show-definitions-function #'xref-show-definitions-completing-read))
 
-(use-package consult-org-roam
-  :hook (org-roam-mode . consult-org-roam-mode)
-  :config
-  (setq consult-org-roam-grep-func #'consult-ripgrep)
-  ;; Eventually suppress previewing for certain functions
-  (consult-customize
-   consult-org-roam-forward-links
-   :preview-key (kbd "M-."))
-  :bind
-  ("C-c n e" . consult-org-roam-file-find)
-  ("C-c n b" . consult-org-roam-backlinks)
-  ("C-c n r" . consult-org-roam-search))
+(use-package kbd-mode
+  :straight (:host github :repo "kmonad/kbd-mode")
+  :mode ("\\.kbd\\'" . kbd-mode))
 
 (use-package unfill :defer t)
 (use-package burly :defer t)
@@ -2781,9 +2833,9 @@ capture was not aborted."
   (:keymaps 'bufler-list-mode-map "Q" 'kill-this-buffer))
 
 (use-package deft
-  :commands (deft)
+  :commands (deft deft-find-file)
   :config
-  (setq deft-directory org-roam-directory
+  (setq deft-directory org-directory
         deft-strip-summary-regexp ":PROPERTIES:\n\\(.+\n\\)+:END:\n"
         deft-use-filename-as-title t
         deft-recursive t
@@ -2882,8 +2934,11 @@ capture was not aborted."
     (when (buffer-live-p buf)
       (kill-buffer buf))))
 
+(setq rmh-elfeed-org-files '("~/Documents/org/elfeed.org"))
+
 (use-package elfeed
   :commands elfeed
+  :hook (elfeed-search-mode-hook . elfeed-update)
   :general
   (:states 'motion
            :keymaps 'elfeed-search-mode-map
@@ -2911,8 +2966,6 @@ capture was not aborted."
   (setq elfeed-db-directory (concat user-emacs-directory "elfeed/db/")
         elfeed-enclosure-default-dir (concat user-emacs-directory "elfeed/enclosures/"))
   :config
-  (add-hook 'elfeed-search-mode-hook 'elfeed-update)
-
   ;; Buffers are read only and, so we need only motion state
   (add-to-list 'evil-motion-state-modes 'elfeed-search-mode)
   (add-to-list 'evil-motion-state-modes 'elfeed-show-mode)
@@ -2927,8 +2980,6 @@ capture was not aborted."
 
 (use-package elfeed-org
   :after elfeed
-  :preface
-  (setq rmh-elfeed-org-files '("~/org/elfeed.org"))
   :config
   (elfeed-org))
 
@@ -2940,8 +2991,8 @@ capture was not aborted."
 (use-package auctex
   :defer t
   :init
-  (setq TeX-engine 'xetex ;; Use XeTeX
-        latex-run-command "xetex")
+  (setq TeX-engine 'luatex ;; Use luaTeX
+        latex-run-command "luatex")
 
   (setq TeX-parse-self t ; parse on load
         TeX-auto-save t  ; parse on save
@@ -3058,8 +3109,17 @@ capture was not aborted."
   (popper-mode +1))
 
 (use-package eglot
-  :commands eglot eglot-ensure
+  :hook ((c-mode . eglot-ensure)
+         (sh-mode . eglot-ensure)
+         (latex-mode . eglot-ensure))
+  :custom-face
+  ;; Make highlight symbols stand out better
+  (eglot-highlight-symbol-face ((t (:inherit bold :underline t))))
+  :commands (eglot eglot-ensure)
   :config
+  ;; Replace the default lua server
+  (add-to-list 'eglot-server-programs '(lua-mode . ("lua-language-server")))
+
   (setq eglot-sync-connect 1
         eglot-connect-timeout 10
         eglot-autoshutdown t
@@ -3067,17 +3127,12 @@ capture was not aborted."
         ;; NOTE We disable eglot-auto-display-help-buffer because :select t in
         ;;      its popup rule causes eglot to steal focus too often.
         eglot-auto-display-help-buffer nil)
-  (setq eglot-stay-out-of '(flymake))
-  (push :workspace/didChangeWorkspaceFolders eglot-ignored-server-capabilities))
+  (setq eglot-stay-out-of '(flymake)))
 
 (use-package consult-eglot
   :after eglot consult vertico
   :general
   (:keymaps 'eglot-mode-map [remap xref-find-apropos] #'consult-eglot-sympbols))
-
-(add-hook 'c-mode-hook 'eglot-ensure)
-(add-hook 'sh-mode-hook 'eglot-ensure)
-(add-hook 'latex-mode-hook 'eglot-ensure)
 
 (use-package format-all
   :commands format-all-buffer format-all-mode)
@@ -3097,6 +3152,12 @@ capture was not aborted."
 (use-package rainbow-delimiters
   :commands rainbow-delimiters-mode
   :hook (prog-mode . rainbow-delimiters-mode))
+
+(use-package lua-mode
+  :hook (lua-mode . eglot-ensure)
+  :mode ("\\.lua\\'" . lua-mode)
+  :config
+  (setq lua-indent-level 2))
 
 ;; A better python mode (supposedly)
 (use-package python-mode
