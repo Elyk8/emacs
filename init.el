@@ -550,12 +550,12 @@ If the universal prefix argument is used then will the windows too."
     ("kill" (evil-quit))
     (- (error command))))
 
-;; Change the user-emacs-directory to keep unwanted things out of ~/.emacs.d
-(setq user-emacs-directory (expand-file-name "~/.cache/emacs/")
-      url-history-file (expand-file-name "url/history" user-emacs-directory))
-
-;; Use no-littering to automatically set common paths to the new user-emacs-directory
-(use-package no-littering)
+;; Use no-littering to automatically set common paths to unclutter our emacs directory
+(use-package no-littering
+  :config
+  ;; Stores annoying auto save files in one directory
+  (setq auto-save-file-name-transforms
+	    `((".*" ,(no-littering-expand-var-file-name "auto-save/") t))))
 
 ;; Keep customization settings in a temporary file (thanks Ambrevar!)
 (setq custom-file
@@ -693,6 +693,9 @@ If the universal prefix argument is used then will the windows too."
   ;; Show home folder path as a ~
   (setq recentf-filename-handlers
         (append '(abbreviate-file-name) recentf-filename-handlers))
+
+  (add-to-list 'recentf-exclude no-littering-var-directory)
+  (add-to-list 'recentf-exclude no-littering-etc-directory)
   (recentf-mode))
 
 (require 'uniquify)
@@ -707,6 +710,9 @@ If the universal prefix argument is used then will the windows too."
 (setq save-interprogram-paste-before-kill t
       apropos-do-all t
       mouse-yank-at-point t)
+
+;; Make executable prefix to env
+(setq executable-prefix-env t)
 
 ;; How thin the window should be to stop splitting vertically (I think)
 (setq split-width-threshold 80)
@@ -877,7 +883,7 @@ If the universal prefix argument is used then will the windows too."
   ;; Top level functions
   "/" '(elk/rg :which-key "ripgrep")
   ";" '(spacemacs/deft :which-key "deft")
-  ":" '(project-find-file :which-key "p-find file")
+  ":" '(projectile-find-file :which-key "p-find file")
   "." '(find-file :which-key "find file")
   "," '(consult-recent-file :which-key "recent files")
   "TAB" '(switch-to-prev-buffer :which-key "previous buffer")
@@ -908,6 +914,15 @@ If the universal prefix argument is used then will the windows too."
   "m" '(magit-status :wk "magit"))
 
 (elk-leader-def
+  :infix "p"
+  "" '(:which-key "project")
+  "f" 'projectile-find-file
+  "s" 'projectile-switch-project
+  "r" 'consult-ripgrep
+  "c" 'projectile-compile-project
+  "d" 'projectile-dired)
+
+(elk-leader-def
  :infix "b"
  ;; Buffers
  "" '(:which-key "buffer")
@@ -916,7 +931,9 @@ If the universal prefix argument is used then will the windows too."
  "s" '(elk/switch-to-scratch-buffer :which-key "scratch buffer")
  "m" '(elk/kill-other-buffers :which-key "kill other buffers")
  "i" '(clone-indirect-buffer  :which-key "indirect buffer")
- "r" '(revert-buffer :which-key "revert buffer"))
+ "r" '(revert-buffer :which-key "revert buffer")
+ "[" '(previous-buffer :which-key "prev. buffer")
+ "]" '(next-buffer :which-key "prev. buffer"))
 
 (elk-leader-def
  :infix "c"
@@ -1296,7 +1313,7 @@ _q_uit        _e_qualize         _]_forward      ^
    ;; Switch
    ("b" consult-buffer)
    ("f" find-file)
-   ("P" project-find-file)
+   ("P" projectile-find-file)
    ("w" ace-swap-window)
    ("[" previous-buffer)
    ("]" next-buffer)
@@ -1569,7 +1586,7 @@ folder, otherwise delete a word"
   ;; Configure other variables and modes in the :config section,
   ;; after lazily loading the package.
   :config
-  (setq consult-project-root-function #'project-root
+  (setq consult-project-root-function #'projectile-root-local
         consult-narrow-key "<"
         consult-line-numbers-widen t
         consult-async-min-input 2
@@ -1623,15 +1640,8 @@ folder, otherwise delete a word"
          ("C-x C-d" . consult-dir)
          ("C-x C-j" . consult-dir-jump-file)))
 
-(use-package consult-project-extra
-  :after consult
-  :bind
-  (("C-c p f" . consult-project-extra-find)
-   ("C-c p o" . consult-project-extra-find-other-window)))
-
 (use-package consult-flycheck
   :after (consult flycheck))
-
 
 (use-package consult-org-roam
   :after org-roam
@@ -1682,7 +1692,7 @@ folder, otherwise delete a word"
   :config
   (setq completion-styles '(orderless flex)
         completion-category-defaults nil
-        completion-category-overrides '((eglot (styles . (orderless flex)))))
+        completion-category-overrides '((file (styles . (orderless flex)))))
   (set-face-attribute 'completions-first-difference nil :inherit nil))
 
 (use-package savehist
@@ -1704,6 +1714,64 @@ folder, otherwise delete a word"
   (marginalia-mode)
   :config
   (add-hook 'marginalia-mode-hook #'all-the-icons-completion-marginalia-setup))
+
+(use-package projectile
+  :commands (projectile-find-file
+             projectile-project-root
+             projectile-project-name
+             projectile-project-p
+             projectile-locate-dominating-file
+             projectile-relevant-known-projects)
+  :bind(("C-M-p" . projectile-find-file)
+        ("C-c p" . projectile-command-map))
+  :init
+  (setq projectile-cache-file (concat no-littering-var-directory "projectile.cache")
+        ;; Auto-discovery is slow to do by default. Better to update the list
+        ;; when you need to (`projectile-discover-projects-in-search-path').
+        projectile-auto-discover nil
+        projectile-globally-ignored-files '(".DS_Store" "TAGS")
+        projectile-globally-ignored-file-suffixes '(".elc" ".pyc" ".o")
+        projectile-kill-buffers-filter 'kill-only-files
+        projectile-ignored-projects '("~/")
+        ;; The original `projectile-default-mode-line' can be expensive over
+        ;; TRAMP, so we gimp it in remote buffers.
+        projectile-mode-line-function
+        (lambda ()
+          (if (file-remote-p default-directory) ""
+            (projectile-default-mode-line))))
+
+  (global-set-key [remap evil-jump-to-tag] #'projectile-find-tag)
+  (global-set-key [remap find-tag]         #'projectile-find-tag)
+
+  :config
+  (projectile-mode +1)
+  (setq projectile-completion-system 'default)
+
+  ;; In the interest of performance, we reduce the number of project root marker
+  ;; files/directories projectile searches for when resolving the project root.
+  (setq projectile-project-root-files-bottom-up
+        (append '(".projectile"  ; projectile's root marker
+                  ".git")        ; Git VCS root dir
+                (when (executable-find "hg")
+                  '(".hg"))      ; Mercurial VCS root dir
+                (when (executable-find "bzr")
+                  '(".bzr")))    ; Bazaar VCS root dir
+        ;; This will be filled by other modules. We build this list manually so
+        ;; projectile doesn't perform so many file checks every time it resolves
+        ;; a project's root -- particularly when a file has no project.
+        projectile-project-root-files '()
+        projectile-project-root-files-top-down-recurring '("Makefile"))
+
+  (push (abbreviate-file-name no-littering-etc-directory) projectile-globally-ignored-directories)
+  (push (abbreviate-file-name no-littering-var-directory) projectile-globally-ignored-directories)
+
+    ;; Per-project compilation buffers
+  (setq compilation-buffer-name-function #'projectile-compilation-buffer-name
+        compilation-save-buffers-predicate #'projectile-current-project-buffer-p)
+  ;; Treat current directory in dired as a "file in a project" and track it
+  (add-hook 'dired-before-readin-hook #'projectile-track-known-projects-find-file-hook)
+
+  )
 
 (use-package smartparens
   :diminish smartparens-mode
@@ -1937,20 +2005,20 @@ folder, otherwise delete a word"
 (setq-default line-spacing elk-default-line-spacing)
 
 (set-face-attribute 'default nil
-                    :family "JetBrains Mono"
+                    :family "Fira Code"
                     :weight 'regular
                     :height elk-text-height)
 
 ;; Float height value (1.0) makes fixed-pitch take height 1.0 * height of default
 ;; This means it will scale along with default when the text is zoomed
 (set-face-attribute 'fixed-pitch nil
-                    :family "JetBrains Mono"
+                    :family "Fira Code"
                     :weight 'regular
                     :height elk-text-height)
 
 ;; Height of 160 seems to match perfectly with 12-point on Google Docs
 (set-face-attribute 'variable-pitch nil
-                    :family "Fira Sans"
+                    :family "Iosevka Aile"
                     :weight 'book
                     :height elk-larger-text)
 
@@ -2041,7 +2109,7 @@ folder, otherwise delete a word"
   (org-scheduled-previously ((t (:background "red")))))
 
 ;; Load the theme here
-(elk/load-theme 'doom-dracula)
+(elk/load-theme 'doom-dark+)
 
 (setq-default fringes-outside-margins nil)
 (setq-default indicate-buffer-boundaries nil) ;; Otherwise shows a corner icon on the edge
@@ -2713,6 +2781,10 @@ Meant for `org-mode-hook'."
          :if-new (file+head "article/%<%Y%m%d%H%M%S>-${slug}.org" "#+title: ${title}\n#+date: %U\n#+filetags: Seedling\n")
          :immediate-finish t
          :unnarrowed t)
+        ("s" "school" plain "\n%?"
+         :if-new (file+head "school/%<%Y%m%d%H%M%S>-${slug}.org" "#+title: ${title}\n#+date: %U\n")
+         :immediate-finish t
+         :unnarrowed t)
         ("p" "project" plain "\n* Goals\n\n%?\n\n* Tasks\n\n** TODO Add initial tasks\n\n* Dates\n\n"
          :if-new (file+head "project/%<%Y%m%d%H%M%S>-${slug}.org" "#+title: ${title}\n#+category: ${title}\n#+date: %U\n#+filetags: Project\n\n")
          :immediate-finish t
@@ -3100,6 +3172,7 @@ capture was not aborted."
   (popper-reference-buffers '("\\*Messages\\*"
                               "Output\\*$"
                               "\\*Warnings\\*"
+                              "\\*eldoc\\*"
                               "\\*Async Shell Command\\*"
                               help-mode
                               helpful-mode
@@ -3117,8 +3190,9 @@ capture was not aborted."
   (eglot-highlight-symbol-face ((t (:inherit bold :underline t))))
   :commands (eglot eglot-ensure)
   :config
-  ;; Replace the default lua server
-  (add-to-list 'eglot-server-programs '(lua-mode . ("lua-language-server")))
+  ;; Replace default servers
+  (add-to-list 'eglot-server-programs '(lua-mode . "lua-language-server"))
+  (add-to-list 'eglot-server-programs '((c++-mode c-mode) "ccls"))
 
   (setq eglot-sync-connect 1
         eglot-connect-timeout 10
@@ -3130,9 +3204,13 @@ capture was not aborted."
   (setq eglot-stay-out-of '(flymake)))
 
 (use-package consult-eglot
-  :after eglot consult vertico
+  :after (eglot consult vertico)
   :general
-  (:keymaps 'eglot-mode-map [remap xref-find-apropos] #'consult-eglot-sympbols))
+  (:keymaps 'eglot-mode-map [remap xref-find-apropos] #'consult-eglot-symbols))
+
+(use-package flycheck
+  :config
+  (global-flycheck-mode))
 
 (use-package format-all
   :commands format-all-buffer format-all-mode)
@@ -3152,6 +3230,14 @@ capture was not aborted."
 (use-package rainbow-delimiters
   :commands rainbow-delimiters-mode
   :hook (prog-mode . rainbow-delimiters-mode))
+
+(use-package platformio-mode
+  :config
+  ;; Enable ccls for all c++ files, and platformio-mode only
+  ;; when needed (platformio.ini present in project root).
+  (add-hook 'c++-mode-hook (lambda ()
+                             (lsp-deferred)
+                             (platformio-conditionally-enable))))
 
 (use-package lua-mode
   :hook (lua-mode . eglot-ensure)
@@ -3205,7 +3291,7 @@ capture was not aborted."
 (use-package yaml-mode
   :mode "Procfile\\'"
   :init
-  (add-hook 'yaml-mode-local-vars-hook #'eglot-ensure 'append))
+  (add-hook 'yaml-mode-local-vars-hook #'lsp 'append))
 
 (use-package sudo-edit
   :defer t

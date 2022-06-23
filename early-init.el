@@ -35,7 +35,7 @@
   (startup-redirect-eln-cache
    (convert-standard-filename
 	  (expand-file-name  "var/eln-cache/" user-emacs-directory))))
-
+ 
 ;; ENCODING -------------
 (set-language-environment "UTF-8")
 
